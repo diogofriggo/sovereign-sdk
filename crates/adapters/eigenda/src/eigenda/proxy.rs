@@ -1,5 +1,6 @@
+use super::types::{StandardCommitment, StandardCommitmentParseError};
 use hex::encode;
-use reqwest::{IntoUrl, Url, header::CONTENT_TYPE};
+use reqwest::{header::CONTENT_TYPE, IntoUrl, Url};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -22,8 +23,8 @@ impl ProxyClient {
     }
 
     /// Fetch blob data for the given certificate
-    pub async fn get_blob(&self, cert: &[u8]) -> Result<Vec<u8>, ProxyError> {
-        let hex = encode(cert);
+    pub async fn get_blob(&self, cert: &StandardCommitment) -> Result<Vec<u8>, ProxyError> {
+        let hex = encode(cert.to_rlp_bytes());
         let mut url = self.base_url.join(&format!("/get/0x{hex}"))?;
         url.set_query(Some("commitment_mode=standard"));
 
@@ -36,7 +37,7 @@ impl ProxyClient {
     }
 
     /// Stores the new blob and returns a certificate
-    pub async fn store_blob(&self, blob: &[u8]) -> Result<Vec<u8>, ProxyError> {
+    pub async fn store_blob(&self, blob: &[u8]) -> Result<StandardCommitment, ProxyError> {
         let mut url = self.base_url.join("/put")?;
         url.set_query(Some("commitment_mode=standard"));
 
@@ -49,8 +50,9 @@ impl ProxyClient {
 
         let response = self.inner.execute(request).await?;
         let response = response.bytes().await?;
+        dbg!(response.as_ref());
 
-        Ok(response.to_vec())
+        Ok(StandardCommitment::from_rlp_bytes(response.as_ref())?)
     }
 }
 
@@ -68,6 +70,10 @@ pub enum ProxyError {
     /// Error when the HTTP request times out.
     #[error("HTTP request timed out")]
     HttpTimeout,
+
+    /// Error parsing the commitment
+    #[error("StandardCommitmentParseError: {0}")]
+    StandardCommitmentParseError(#[from] StandardCommitmentParseError),
 }
 
 impl From<reqwest::Error> for ProxyError {
@@ -84,12 +90,12 @@ pub mod tests {
     use std::{borrow::Cow, collections::HashMap};
 
     use testcontainers::{
-        ContainerAsync, Image,
-        core::{ContainerPort, WaitFor},
-        runners::AsyncRunner,
+        core::{ContainerPort, WaitFor}, runners::AsyncRunner,
+        ContainerAsync,
+        Image,
     };
 
-    use crate::service::proxy::ProxyClient;
+    use super::ProxyClient;
 
     /// Start the proxy server.
     pub async fn start_proxy() -> Result<(String, ContainerAsync<EigenDaProxy>), anyhow::Error> {

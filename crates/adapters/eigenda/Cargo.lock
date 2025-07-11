@@ -1549,6 +1549,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "canoe-bindings"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Layr-Labs/hokulea.git?rev=efe7767dde967008de5309f44fecb72aa2ef1e54#efe7767dde967008de5309f44fecb72aa2ef1e54"
+dependencies = [
+ "alloy-sol-types",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1976,6 +1984,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "eigenda-cert"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Layr-Labs/hokulea.git?rev=efe7767dde967008de5309f44fecb72aa2ef1e54#efe7767dde967008de5309f44fecb72aa2ef1e54"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "anyhow",
+ "canoe-bindings",
+ "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -4593,6 +4614,7 @@ dependencies = [
  "async-trait",
  "borsh",
  "derive_more 2.0.1",
+ "eigenda-cert",
  "futures",
  "hex",
  "reqwest",

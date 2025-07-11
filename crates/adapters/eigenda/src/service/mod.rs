@@ -1,5 +1,6 @@
 mod ethereum;
-mod proxy;
+
+pub use crate::eigenda::types::{StandardCommitment, StandardCommitmentParseError};
 
 use std::str::FromStr;
 use std::time::Duration;
@@ -30,11 +31,11 @@ use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::{debug, instrument, warn};
 
+use crate::eigenda::proxy::{ProxyClient, ProxyError};
 use crate::service::ethereum::extract_certificate;
-use crate::spec::{BlobWithSender, NamespaceId, RollupParams, TransactionWithBlob};
+use crate::spec::{Blob, BlobWithSender, NamespaceId, RollupParams, TransactionWithBlob};
 use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 use crate::{
-    service::proxy::{ProxyClient, ProxyError},
     spec::{EigenDaSpec, EthereumBlockHeader, EthereumHash},
     verifier::EigenDaVerifier,
 };
@@ -138,10 +139,11 @@ impl EigenDaService {
     /// Submit the certificate to the ethereum
     async fn submit_certificate(
         &self,
-        certificate: &[u8],
+        certificate: &StandardCommitment,
         namespace: NamespaceId,
     ) -> Result<EthereumHash, EigenDaServiceError> {
-        let sidecar = SidecarBuilder::<SimpleCoder>::from_slice(certificate);
+        let bytes = certificate.to_rlp_bytes();
+        let sidecar = SidecarBuilder::<SimpleCoder>::from_slice(&bytes);
         let sidecar = sidecar
             .build()
             .expect("the sidecar builder is configured correctly");
@@ -207,8 +209,11 @@ impl DaService for EigenDaService {
             .map(|tx| {
                 let proxy = &self.proxy;
                 async move {
-                    let blob = if let Some(cert) = extract_certificate(&tx) {
-                        Some(proxy.get_blob(&cert).await?)
+                    let blob = if let Some(certificate) = extract_certificate(&tx) {
+                        Some(Blob {
+                            data: proxy.get_blob(&certificate).await?,
+                            certificate,
+                        })
                     } else {
                         None
                     };
@@ -342,7 +347,7 @@ impl DaService for EigenDaService {
 }
 
 /// An Ethereum block containing only relevant information.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EthereumBlock {
     header: EthereumBlockHeader,
     transactions: Vec<TransactionWithBlob>,
@@ -361,7 +366,9 @@ impl EthereumBlock {
                 namespace
                     .contains(&tx.transaction)
                     .then(|| tx.blob.clone())
-                    .and_then(|blob| blob.map(|blob| BlobWithSender::new(sender, tx_hash, blob)))
+                    .and_then(|blob| {
+                        blob.map(|blob| BlobWithSender::new(sender, tx_hash, blob.data))
+                    })
             })
             .collect::<Vec<_>>()
     }
@@ -409,10 +416,10 @@ mod tests {
     use sov_rollup_interface::{da::DaVerifier, node::da::DaService};
 
     use crate::{
+        eigenda::proxy::tests::start_proxy,
         service::{
-            EigenDaConfig, EigenDaService, EigenDaServiceError,
-            ethereum::tests::{MiningKind, mine_block, start_ethereum_dev_node},
-            proxy::tests::start_proxy,
+            ethereum::tests::{mine_block, start_ethereum_dev_node, MiningKind}, EigenDaConfig, EigenDaService,
+            EigenDaServiceError,
         },
         spec::{NamespaceId, RollupParams},
         verifier::EigenDaVerifier,

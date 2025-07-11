@@ -1,11 +1,13 @@
+use crate::eigenda::types::StandardCommitment;
 use alloy::{
     consensus::{SidecarCoder, SimpleCoder, TxEip4844Variant},
     rpc::types::Transaction,
 };
 use tracing::debug;
 
-/// Extract certificate blob from the ethereum transaction.
-pub fn extract_certificate(transaction: &Transaction) -> Option<Vec<u8>> {
+/// Extract certificate from the ethereum transaction. Returns None if no
+/// parsable certificate exists.
+pub fn extract_certificate(transaction: &Transaction) -> Option<StandardCommitment> {
     // Check if this is an EIP-4844 transaction
     let eip4844_tx = transaction.inner.as_eip4844()?;
 
@@ -24,7 +26,7 @@ pub fn extract_certificate(transaction: &Transaction) -> Option<Vec<u8>> {
     // The certificate is small enough that only one ethereum blob is used
     let decoded = decoded.into_iter().next()?;
 
-    Some(decoded)
+    StandardCommitment::from_rlp_bytes(decoded.as_slice()).ok()
 }
 
 #[cfg(test)]
@@ -32,13 +34,13 @@ pub mod tests {
     use std::borrow::Cow;
 
     use alloy::{
-        providers::{RootProvider, ext::AnvilApi},
+        providers::{ext::AnvilApi, RootProvider},
         rpc::types::anvil::MineOptions,
     };
     use testcontainers::{
-        ContainerAsync, Image,
-        core::{ContainerPort, WaitFor},
-        runners::AsyncRunner,
+        core::{ContainerPort, WaitFor}, runners::AsyncRunner,
+        ContainerAsync,
+        Image,
     };
 
     /// Start local ethereum development node.

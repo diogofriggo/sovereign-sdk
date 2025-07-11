@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "dce0cc06959fc754e06ce00ac2c2ada943a8d621" }
 
+eigenda-cert = { git = "ssh://git@github.com/Layr-Labs/hokulea.git", rev = "efe7767dde967008de5309f44fecb72aa2ef1e54" }
 # rust-eigenda-v2-common = { version = "0.1.3" }
 # rust-eigenda-v2-client = { version = "0.1.4" }
 

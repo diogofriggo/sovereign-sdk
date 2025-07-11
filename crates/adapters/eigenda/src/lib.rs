@@ -2,3 +2,4 @@
 pub mod service;
 pub mod spec;
 pub mod verifier;
+mod eigenda;

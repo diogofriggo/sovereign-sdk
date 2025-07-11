@@ -3,19 +3,22 @@ use std::{hash::Hash, num::TryFromIntError, str::FromStr};
 use alloy::{
     consensus::Transaction as TTransaction,
     eips::Typed2718,
-    primitives::{Address, Bytes, FixedBytes, wrap_fixed_bytes},
+    primitives::{wrap_fixed_bytes, Address, Bytes, FixedBytes},
     rpc::types::{Header, Transaction},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
-    BasicAddress,
     da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
     sov_universal_wallet::UniversalWallet,
+    BasicAddress,
 };
 
-use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
+use crate::{
+    eigenda::types::StandardCommitment,
+    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
+};
 
 /// A specification for the types used by a DA layer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
@@ -287,12 +290,21 @@ impl BlobReaderTrait for BlobWithSender {
 }
 
 /// Struct that holds an Ethereum transaction with certificate and an actual blob
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
     /// The transaction that holds a certificate
     pub transaction: Transaction,
-    /// The actual blob persisted to the EigenDa
-    pub blob: Option<Vec<u8>>,
+    /// Blob with the data certificate
+    pub blob: Option<Blob>,
+}
+
+/// Struct that holds a data blob and certificate.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Blob {
+    /// Storage certificate
+    pub certificate: StandardCommitment,
+    /// The actual blob data persisted to the EigenDa
+    pub data: Vec<u8>,
 }
 
 #[cfg(test)]
