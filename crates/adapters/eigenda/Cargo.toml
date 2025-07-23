@@ -4,16 +4,31 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Sovereign SDK
 sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "dce0cc06959fc754e06ce00ac2c2ada943a8d621" }
 
+# EigenDA
 eigenda-cert = { git = "ssh://git@github.com/Layr-Labs/hokulea.git", rev = "efe7767dde967008de5309f44fecb72aa2ef1e54" }
 # rust-eigenda-v2-common = { version = "0.1.3" }
 # rust-eigenda-v2-client = { version = "0.1.4" }
 
-alloy = { version = "1.0.20", features = [
-    "full",    # TODO: Use only needed features
-    "network",
-] }
+# Alloy
+alloy-primitives = { version = "1.3.0", default-features = false }
+alloy-rpc-types = { version = "1.0.23", default-features = false }
+alloy-rpc-types-eth = { version = "1.0.23", default-features = false }
+alloy-consensus = { version = "1.0.23", default-features = false }
+alloy-eips = { version = "1.0.23", default-features = false }
+alloy-network = { version = "1.0.23", default-features = false }
+alloy-provider = { version = "1.0.23", default-features = false }
+alloy-signer = { version = "1.0.23", default-features = false }
+alloy-signer-local = { version = "1.0.23", default-features = false }
+alloy-transport = { version = "1.0.23", default-features = false }
+alloy-rlp = { version = "0.3.12", default-features = false }
+
+# Reth
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.5.1", default-features = false }
+
+# Others
 anyhow = { version = "1.0.98", default-features = false }
 async-trait = "0.1.88"
 borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
@@ -41,4 +56,17 @@ testcontainers = "0.24.0"
 
 [features]
 default = []
-native = ["dep:tokio", "sov-rollup-interface/native", "dep:reqwest"]
+native = [
+    # Sovereign SDK
+    "sov-rollup-interface/native",
+    # Alloy
+    "alloy-rpc-types/anvil",
+    "alloy-provider/anvil-api",
+    "alloy-eips/kzg",
+    # Reth
+    "reth-trie-common/serde",
+    "reth-trie-common/eip1186",
+    # Others
+    "dep:tokio",
+    "dep:reqwest",
+]

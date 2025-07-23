@@ -1,24 +1,28 @@
+pub mod config;
 mod ethereum;
 
 pub use crate::eigenda::types::{StandardCommitment, StandardCommitmentParseError};
+use crate::service::config::{EigenDaConfig, EigenDaContracts};
 
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::time::Duration;
 
-use alloy::network::TransactionBuilder4844;
-use alloy::providers::{DynProvider, ProviderBuilder};
-use alloy::signers::local::{LocalSigner, LocalSignerError, PrivateKeySigner};
-use alloy::{
-    consensus::{SidecarBuilder, SimpleCoder},
-    eips::{BlockId, BlockNumberOrTag},
-    network::TransactionBuilder,
-    providers::Provider,
-    rpc::types::TransactionRequest,
-    transports::{RpcError, TransportErrorKind},
-};
+use alloy_consensus::{SidecarBuilder, SimpleCoder};
+use alloy_eips::{BlockId, BlockNumberOrTag};
+use alloy_network::TransactionBuilder;
+use alloy_network::TransactionBuilder4844;
+use alloy_primitives::B256;
+use alloy_provider::Provider;
+use alloy_provider::{DynProvider, ProviderBuilder};
+use alloy_rpc_types_eth::Transaction;
+use alloy_rpc_types_eth::TransactionRequest;
+use alloy_signer_local::{LocalSigner, PrivateKeySigner};
+use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
-use futures::future::join_all;
-use schemars::JsonSchema;
+use futures::future::{join_all, try_join4};
+use reth_trie_common::AccountProof;
+use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::da::{BlobReaderTrait, DaProof};
 use sov_rollup_interface::{
@@ -40,30 +44,17 @@ use crate::{
     verifier::EigenDaVerifier,
 };
 
-/// Configuration for the [`EigenDaService`].
-#[derive(Debug, JsonSchema, PartialEq)]
-pub struct EigenDaConfig {
-    /// URL of the Ethereum RPC node
-    pub ethereum_rpc_url: String,
-    /// URL of the EigenDA proxy node
-    pub proxy_url: String,
-    /// Private key of the sequencer. The account with corresponding private key
-    /// is used by the sequencer to persist the certificates to Ethereum.
-    /// Expected private key in the HEX format.
-    pub sequencer_signer: String,
-}
-
 /// Possible errors that can happen when using [`EigenDaService`].
 #[derive(Debug, Error)]
 pub enum EigenDaServiceError {
-    #[error("ProxyError: {0}")]
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+
+    #[error("Error received from the EigenDA proxy: {0}")]
     ProxyError(#[from] ProxyError),
 
-    #[error("EthereumRpcError: {0}")]
+    #[error("Error received from the Ethereum node: {0}")]
     EthereumRpcError(#[from] RpcError<TransportErrorKind>),
-
-    #[error("LocalSignerError: {0}")]
-    LocalSignerError(#[from] LocalSignerError),
 }
 
 /// EigenDaService is responsible for interacting with the EigenDA data availability layer.
@@ -72,8 +63,11 @@ pub enum EigenDaServiceError {
 #[derive(Clone)]
 pub struct EigenDaService {
     /// Client for interacting with the EigenDA proxy node
+    // TODO: Add retrying strategy
     proxy: ProxyClient,
     /// Provider for interacting with an Ethereum node
+    // TODO: Add retrying strategy
+    // TODO: Add caching? `CacheProvider`
     ethereum: DynProvider,
     /// The account to which we are storing the certificates of the batch blobs
     rollup_batch_namespace: NamespaceId,
@@ -82,6 +76,8 @@ pub struct EigenDaService {
     /// Private key of the sequencer. It is used to sign the transactions
     /// persisting the certificates to Ethereum
     sequencer_signer: PrivateKeySigner,
+    /// EigenDA relevant contracts
+    contracts: EigenDaContracts,
 }
 
 impl EigenDaService {
@@ -90,9 +86,16 @@ impl EigenDaService {
         config: EigenDaConfig,
         params: RollupParams,
     ) -> Result<Self, EigenDaServiceError> {
-        let client = ProxyClient::new(config.proxy_url)?;
+        if params.rollup_batch_account == params.rollup_proof_account {
+            return Err(EigenDaServiceError::Configuration(
+                "Namespaces should not be equal".to_string(),
+            ));
+        }
 
-        let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)?;
+        let proxy = ProxyClient::new(config.proxy_url)?;
+
+        let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)
+            .map_err(|err| EigenDaServiceError::Configuration(err.to_string()))?;
         let ethereum = ProviderBuilder::new()
             .wallet(sequencer_signer.clone())
             .connect(&config.ethereum_rpc_url)
@@ -100,11 +103,12 @@ impl EigenDaService {
             .erased();
 
         Ok(Self {
-            proxy: client,
+            proxy,
             ethereum,
             rollup_batch_namespace: params.rollup_batch_account,
             rollup_proof_namespace: params.rollup_proof_account,
             sequencer_signer,
+            contracts: config.contracts,
         })
     }
 
@@ -159,6 +163,142 @@ impl EigenDaService {
         let transaction = self.ethereum.send_transaction(tx).await?;
         Ok(transaction.tx_hash().to_owned().into())
     }
+
+    /// Iterate over transactions in the block and fetch EigenDA certificate
+    /// with the blob data.
+    async fn extract_transactions_with_blob(
+        &self,
+        transactions: Vec<Transaction>,
+    ) -> Result<Vec<TransactionWithBlob>, EigenDaServiceError> {
+        let transactions_fut = transactions
+            .into_iter()
+            .map(|tx| {
+                let proxy = &self.proxy;
+                async move {
+                    // TODO: Add a limit of reference block depth after which
+                    // the certificate is ignored. This is prevention so that
+                    // the attacker can't force the sequencer to fetch a long
+                    // ancestors chain history.
+                    let blob = if let Some(certificate) = extract_certificate(&tx) {
+                        Some(Blob {
+                            data: proxy.get_blob(&certificate).await?,
+                            certificate,
+                        })
+                    } else {
+                        None
+                    };
+
+                    Ok::<_, ProxyError>(TransactionWithBlob {
+                        transaction: tx,
+                        blob,
+                    })
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let transactions = join_all(transactions_fut)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(transactions)
+    }
+
+    /// Fetch ancestors from the earliest referenced block to the current
+    /// height. The returned ancestors are contiguous. The first ancestor is the
+    /// earliest referenced block, the last ancestor is the parent of the block
+    /// on the `current_height`.
+    async fn fetch_ancestors(
+        &self,
+        referenced_blocks: &HashSet<u64>,
+        current_height: u64,
+    ) -> Result<Vec<AncestorMetadata>, EigenDaServiceError> {
+        // If no referenced blocks, we don't need any ancestors.
+        let Some(&earliest_reference) = referenced_blocks.iter().min() else {
+            return Ok(vec![]);
+        };
+
+        let fetch_ancestors_fut =
+            (earliest_reference..current_height)
+                .step_by(1)
+                .map(|height| async move {
+                    let block = self
+                        .ethereum
+                        .get_block_by_number(height.into())
+                        .await?
+                        .unwrap();
+
+                    // Retrieve additional data only if the block is referenced by some certificate
+                    let data = if referenced_blocks.contains(&height) {
+                        Some(self.fetch_ancestor_state(height).await?)
+                    } else {
+                        None
+                    };
+
+                    Ok::<_, EigenDaServiceError>(AncestorMetadata {
+                        header: EthereumBlockHeader::from(block.header),
+                        data,
+                    })
+                });
+
+        let ancestors = join_all(fetch_ancestors_fut)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ancestors)
+    }
+
+    /// Fetches the relavant state used at certificate creation. This state is
+    /// later used to verify the EigenDA certificate construction.
+    async fn fetch_ancestor_state(
+        &self,
+        block_height: u64,
+    ) -> Result<AncestorStateData, EigenDaServiceError> {
+        // TODO: Specify correct storage keys
+        let registry_coordinator_fut = self
+            .ethereum
+            .get_proof(self.contracts.registry_coordinator.into(), vec![])
+            .number(block_height)
+            .into_future();
+
+        // TODO: Specify correct storage keys
+        let delegation_manager_fut = self
+            .ethereum
+            .get_proof(self.contracts.delegation_manager.into(), vec![])
+            .number(block_height)
+            .into_future();
+
+        // TODO: Specify correct storage keys
+        let bls_apt_registry_fut = self
+            .ethereum
+            .get_proof(self.contracts.bls_apt_registry.into(), vec![])
+            .number(block_height)
+            .into_future();
+
+        // TODO: Specify correct storage keys
+        let stake_registry_fut = self
+            .ethereum
+            .get_proof(self.contracts.stake_registry.into(), vec![])
+            .number(block_height)
+            .into_future();
+
+        let (registry_coordinator, delegation_manager, bls_apt_registry, stake_registry) =
+            try_join4(
+                registry_coordinator_fut,
+                delegation_manager_fut,
+                bls_apt_registry_fut,
+                stake_registry_fut,
+            )
+            .await?;
+
+        Ok(AncestorStateData {
+            registry_coordinator: AccountProof::from(registry_coordinator),
+            delegation_manager: AccountProof::from(delegation_manager),
+            bls_apt_registry: AccountProof::from(bls_apt_registry),
+            stake_registry: AccountProof::from(stake_registry),
+        })
+    }
 }
 
 #[async_trait]
@@ -203,36 +343,29 @@ impl DaService for EigenDaService {
             }
         };
 
-        let transactions_fut = block
-            .transactions
-            .into_transactions()
-            .map(|tx| {
-                let proxy = &self.proxy;
-                async move {
-                    let blob = if let Some(certificate) = extract_certificate(&tx) {
-                        Some(Blob {
-                            data: proxy.get_blob(&certificate).await?,
-                            certificate,
-                        })
-                    } else {
-                        None
-                    };
+        let header = EthereumBlockHeader::try_from(block.header.clone())?;
 
-                    Ok::<_, anyhow::Error>(TransactionWithBlob {
-                        transaction: tx,
-                        blob,
-                    })
-                }
+        // Iterate over transactions in the block and fetch sequencer relevant data
+        let transactions = self
+            .extract_transactions_with_blob(block.into_transactions_vec())
+            .await?;
+
+        // Block heights referenced by the certificates persisted in the block.
+        // The number of ancestors we'll fetch depends on this earliest
+        // reference.
+        let referenced_blocks = transactions
+            .iter()
+            .flat_map(|t| {
+                t.blob
+                    .as_ref()
+                    .map(|b| b.certificate.reference_block() as u64)
             })
-            .collect::<Vec<_>>();
-
-        let transactions = join_all(transactions_fut)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<HashSet<_>>();
+        let ancestors = self.fetch_ancestors(&referenced_blocks, height).await?;
 
         Ok(EthereumBlock {
-            header: EthereumBlockHeader::try_from(block.header)?,
+            ancestors,
+            header,
             transactions,
         })
     }
@@ -346,10 +479,59 @@ impl DaService for EigenDaService {
     }
 }
 
-/// An Ethereum block containing only relevant information.
+/// Contains data needed to validate the certificate using the ancestor as the
+/// reference block. It also contains proofs used to verify the data.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AncestorStateData {
+    registry_coordinator: AccountProof,
+    delegation_manager: AccountProof,
+    bls_apt_registry: AccountProof,
+    stake_registry: AccountProof,
+}
+
+impl AncestorStateData {
+    /// Verifies the data against the state root.
+    pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
+        self.registry_coordinator.verify(state_root)?;
+        self.delegation_manager.verify(state_root)?;
+        self.bls_apt_registry.verify(state_root)?;
+        self.stake_registry.verify(state_root)?;
+
+        Ok(())
+    }
+
+    /// Extract the data.
+    ///
+    /// NOTE: The data extracted is not verified.
+    pub fn extract(&self) -> Result<(), ()> {
+        // TODO: Extract the data from proofs to some struct used to verify the
+        // certificate. You need the corect storage keys here again.
+        todo!()
+    }
+}
+
+/// Data tracked for the specific ancestor.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AncestorMetadata {
+    // Header for the ancestor block.
+    header: EthereumBlockHeader,
+    // The data needed to validate the certificate referencing this ancestor.
+    // It's `Some` only in cases when we have a certificate that references this
+    // ancestor. If there is no certificate referencing the ancestor the data is
+    // `None`.
+    data: Option<AncestorStateData>,
+}
+
+/// An Ethereum block containing relevant information.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EthereumBlock {
+    /// List of ancestor blocks. The first ancestor in a list is the earliest
+    /// reference block from which the values for certificate creation were
+    /// sourced. The last header in a list is a parent of this block.
+    ancestors: Vec<AncestorMetadata>,
+    /// The current block header.
     header: EthereumBlockHeader,
+    /// Tranasctions included in this block.
     transactions: Vec<TransactionWithBlob>,
 }
 
@@ -418,12 +600,14 @@ mod tests {
     use crate::{
         eigenda::proxy::tests::start_proxy,
         service::{
-            ethereum::tests::{mine_block, start_ethereum_dev_node, MiningKind}, EigenDaConfig, EigenDaService,
-            EigenDaServiceError,
+            EigenDaConfig, EigenDaService, EigenDaServiceError,
+            ethereum::tests::{MiningKind, mine_block, start_ethereum_dev_node},
         },
         spec::{NamespaceId, RollupParams},
         verifier::EigenDaVerifier,
     };
+
+    use super::EigenDaContracts;
 
     #[tokio::test]
     async fn submit_extract_verify_e2e() {
@@ -497,6 +681,12 @@ mod tests {
             ethereum_rpc_url,
             proxy_url,
             sequencer_signer,
+            contracts: EigenDaContracts {
+                registry_coordinator: todo!(),
+                delegation_manager: todo!(),
+                bls_apt_registry: todo!(),
+                stake_registry: todo!(),
+            },
         };
         let params = RollupParams {
             rollup_batch_account,

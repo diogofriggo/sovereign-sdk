@@ -1,18 +1,16 @@
-use std::{hash::Hash, num::TryFromIntError, str::FromStr};
+use std::{hash::Hash, str::FromStr};
 
-use alloy::{
-    consensus::Transaction as TTransaction,
-    eips::Typed2718,
-    primitives::{wrap_fixed_bytes, Address, Bytes, FixedBytes},
-    rpc::types::{Header, Transaction},
-};
+use alloy_consensus::{Header, Transaction as TTransaction};
+use alloy_eips::Typed2718;
+use alloy_primitives::{Address, AddressError, Bytes, FixedBytes, wrap_fixed_bytes};
+use alloy_rpc_types_eth::{Header as RpcHeader, Transaction};
 use borsh::{BorshDeserialize, BorshSerialize};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
+    BasicAddress,
     da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
     sov_universal_wallet::UniversalWallet,
-    BasicAddress,
 };
 
 use crate::{
@@ -82,7 +80,7 @@ impl From<NamespaceId> for Address {
 }
 
 impl FromStr for NamespaceId {
-    type Err = alloy::primitives::AddressError;
+    type Err = AddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(EthereumAddress::from_str(s)?))
@@ -91,25 +89,17 @@ impl FromStr for NamespaceId {
 
 /// An Ethereum block header containing only relevant information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EthereumBlockHeader {
-    parent_hash: EthereumHash,
-    hash: EthereumHash,
-    timestamp: Time,
-    height: u64,
+pub struct EthereumBlockHeader(Header);
+
+impl From<RpcHeader> for EthereumBlockHeader {
+    fn from(header: RpcHeader) -> Self {
+        Self(header.inner)
+    }
 }
 
-impl TryFrom<Header> for EthereumBlockHeader {
-    type Error = TryFromIntError;
-
-    fn try_from(header: Header) -> Result<Self, Self::Error> {
-        let timestamp = header.timestamp.try_into()?;
-
-        Ok(Self {
-            timestamp: Time::from_secs(timestamp),
-            parent_hash: EthereumHash::from(header.parent_hash),
-            hash: EthereumHash::from(header.hash_slow()),
-            height: header.number,
-        })
+impl AsRef<Header> for EthereumBlockHeader {
+    fn as_ref(&self) -> &Header {
+        &self.0
     }
 }
 
@@ -117,19 +107,24 @@ impl BlockHeaderTrait for EthereumBlockHeader {
     type Hash = EthereumHash;
 
     fn prev_hash(&self) -> Self::Hash {
-        self.parent_hash
+        self.0.parent_hash.into()
     }
 
     fn hash(&self) -> Self::Hash {
-        self.hash
+        self.0.hash_slow().into()
     }
 
     fn height(&self) -> u64 {
-        self.height
+        self.0.number
     }
 
     fn time(&self) -> Time {
-        self.timestamp.clone()
+        let timestamp = self
+            .0
+            .timestamp
+            .try_into()
+            .expect("is able to convert to i64");
+        Time::from_secs(timestamp)
     }
 }
 
@@ -147,9 +142,7 @@ impl BlockHeaderTrait for EthereumBlockHeader {
     Ord,
     UniversalWallet,
 )]
-pub struct EthereumAddress(
-    #[sov_wallet(as_ty = "[u8; 20]", display = "hex")] alloy::primitives::Address,
-);
+pub struct EthereumAddress(#[sov_wallet(as_ty = "[u8; 20]", display = "hex")] Address);
 
 impl BasicAddress for EthereumAddress {}
 
@@ -188,12 +181,10 @@ impl AsRef<[u8]> for EthereumAddress {
 }
 
 impl FromStr for EthereumAddress {
-    type Err = alloy::primitives::AddressError;
+    type Err = AddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(EthereumAddress(
-            alloy::primitives::Address::parse_checksummed(s, None)?,
-        ))
+        Ok(EthereumAddress(Address::parse_checksummed(s, None)?))
     }
 }
 
@@ -201,19 +192,17 @@ impl TryFrom<&[u8]> for EthereumAddress {
     type Error = anyhow::Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Ok(EthereumAddress(alloy::primitives::Address::try_from(
-            value,
-        )?))
+        Ok(EthereumAddress(Address::try_from(value)?))
     }
 }
 
-impl From<alloy::primitives::Address> for EthereumAddress {
-    fn from(value: alloy::primitives::Address) -> Self {
+impl From<Address> for EthereumAddress {
+    fn from(value: Address) -> Self {
         Self(value)
     }
 }
 
-impl From<EthereumAddress> for alloy::primitives::Address {
+impl From<EthereumAddress> for Address {
     fn from(value: EthereumAddress) -> Self {
         value.0
     }

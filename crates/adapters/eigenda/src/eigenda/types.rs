@@ -1,4 +1,4 @@
-use alloy::rlp::{Decodable, Encodable, Error};
+use alloy_rlp::{Decodable, Encodable, Error};
 use eigenda_cert::{EigenDACertV2, EigenDACertV3, EigenDAVersionedCert};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -37,6 +37,14 @@ impl StandardCommitment {
         };
 
         Ok(Self(versioned_cert))
+    }
+
+    /// Get reference block used when constructing this certificate.
+    pub fn reference_block(&self) -> u32 {
+        match &self.0 {
+            EigenDAVersionedCert::V2(c) => c.batch_header_v2.reference_block_number,
+            EigenDAVersionedCert::V3(c) => c.batch_header_v2.reference_block_number,
+        }
     }
 
     pub fn to_rlp_bytes(&self) -> Vec<u8> {

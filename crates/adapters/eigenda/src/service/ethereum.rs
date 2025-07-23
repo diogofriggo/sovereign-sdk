@@ -1,8 +1,6 @@
 use crate::eigenda::types::StandardCommitment;
-use alloy::{
-    consensus::{SidecarCoder, SimpleCoder, TxEip4844Variant},
-    rpc::types::Transaction,
-};
+use alloy_consensus::{SidecarCoder, SimpleCoder, TxEip4844Variant};
+use alloy_rpc_types_eth::Transaction;
 use tracing::debug;
 
 /// Extract certificate from the ethereum transaction. Returns None if no
@@ -34,13 +32,13 @@ pub mod tests {
     use std::borrow::Cow;
 
     use alloy::{
-        providers::{ext::AnvilApi, RootProvider},
+        providers::{RootProvider, ext::AnvilApi},
         rpc::types::anvil::MineOptions,
     };
     use testcontainers::{
-        core::{ContainerPort, WaitFor}, runners::AsyncRunner,
-        ContainerAsync,
-        Image,
+        ContainerAsync, Image,
+        core::{ContainerPort, WaitFor},
+        runners::AsyncRunner,
     };
 
     /// Start local ethereum development node.
