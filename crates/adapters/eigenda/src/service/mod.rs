@@ -3,6 +3,7 @@ mod ethereum;
 
 pub use crate::eigenda::types::{StandardCommitment, StandardCommitmentParseError};
 use crate::service::config::{EigenDaConfig, EigenDaContracts};
+use crate::spec::EthereumAddress;
 
 use std::collections::HashSet;
 use std::str::FromStr;
@@ -476,6 +477,11 @@ impl DaService for EigenDaService {
             .collect::<Vec<Vec<u8>>>();
 
         Ok(proofs)
+    }
+
+    /// Returns a [`DaSpec::Address`] that signs blobs submitted by this instance of [`DaService`]
+    async fn get_signer(&self) -> <Self::Spec as DaSpec>::Address {
+        EthereumAddress::from(self.sequencer_signer.address())
     }
 }
 

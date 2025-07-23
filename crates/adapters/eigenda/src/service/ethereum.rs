@@ -31,10 +31,9 @@ pub fn extract_certificate(transaction: &Transaction) -> Option<StandardCommitme
 pub mod tests {
     use std::borrow::Cow;
 
-    use alloy::{
-        providers::{RootProvider, ext::AnvilApi},
-        rpc::types::anvil::MineOptions,
-    };
+    use alloy_provider::{RootProvider, ext::AnvilApi};
+    use alloy_rpc_types::anvil::MineOptions;
+
     use testcontainers::{
         ContainerAsync, Image,
         core::{ContainerPort, WaitFor},

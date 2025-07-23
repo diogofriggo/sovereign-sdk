@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 # Sovereign SDK
-sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "dce0cc06959fc754e06ce00ac2c2ada943a8d621" }
+sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "b59ebb8d7576d4ce2881e49bc368b5b91076d7d5" }
 
 # EigenDA
 eigenda-cert = { git = "ssh://git@github.com/Layr-Labs/hokulea.git", rev = "efe7767dde967008de5309f44fecb72aa2ef1e54" }
@@ -13,17 +13,17 @@ eigenda-cert = { git = "ssh://git@github.com/Layr-Labs/hokulea.git", rev = "efe7
 # rust-eigenda-v2-client = { version = "0.1.4" }
 
 # Alloy
-alloy-primitives = { version = "1.3.0", default-features = false }
-alloy-rpc-types = { version = "1.0.23", default-features = false }
-alloy-rpc-types-eth = { version = "1.0.23", default-features = false }
 alloy-consensus = { version = "1.0.23", default-features = false }
 alloy-eips = { version = "1.0.23", default-features = false }
 alloy-network = { version = "1.0.23", default-features = false }
+alloy-primitives = { version = "1.3.0", default-features = false }
 alloy-provider = { version = "1.0.23", default-features = false }
+alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-rpc-types = { version = "1.0.23", default-features = false }
+alloy-rpc-types-eth = { version = "1.0.23", default-features = false }
 alloy-signer = { version = "1.0.23", default-features = false }
 alloy-signer-local = { version = "1.0.23", default-features = false }
 alloy-transport = { version = "1.0.23", default-features = false }
-alloy-rlp = { version = "0.3.12", default-features = false }
 
 # Reth
 reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.5.1", default-features = false }
@@ -36,21 +36,22 @@ derive_more = { version = "2.0.1" }
 futures = { version = "0.3.31" }
 hex = { version = "0.4.3" }
 reqwest = { version = "0.12.22", features = ["json"], optional = true }
-schemars = { version = "0.8.22", default-features = false, features = [
+# Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk-wip/blob/b59ebb8d7576d4ce2881e49bc368b5b91076d7d5/Cargo.toml#L244
+schemars = { version = "0.8.21", default-features = false, features = [
     "derive",
 ] }
 serde = { version = "1.0.219", default-features = false, features = [
     "alloc",
     "derive",
 ] }
-serde_json = { version = "1.0.140" }
+serde_json = { version = "1.0.141" }
 thiserror = "2.0.12"
 tokio = { version = "1.46.1", features = ["sync"], optional = true }
 tracing = { version = "0.1.41" }
 url = { version = "2.5.4" }
 
 [dev-dependencies]
-alloy = { version = "1.0.20", features = ["providers"] }
+# Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk-wip/blob/b59ebb8d7576d4ce2881e49bc368b5b91076d7d5/Cargo.toml#L255
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 testcontainers = "0.24.0"
 

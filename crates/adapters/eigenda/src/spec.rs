@@ -300,7 +300,6 @@ pub struct Blob {
 mod tests {
     use std::str::FromStr;
 
-    use alloy::hex::{self};
     use sov_rollup_interface::sov_universal_wallet::schema::Schema;
 
     use crate::spec::{EthereumAddress, EthereumHash};
