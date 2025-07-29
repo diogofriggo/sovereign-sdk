@@ -1,6 +1,6 @@
 use super::types::{StandardCommitment, StandardCommitmentParseError};
 use hex::encode;
-use reqwest::{header::CONTENT_TYPE, IntoUrl, Url};
+use reqwest::{IntoUrl, Url, header::CONTENT_TYPE};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -90,9 +90,9 @@ pub mod tests {
     use std::{borrow::Cow, collections::HashMap};
 
     use testcontainers::{
-        core::{ContainerPort, WaitFor}, runners::AsyncRunner,
-        ContainerAsync,
-        Image,
+        ContainerAsync, Image,
+        core::{ContainerPort, WaitFor},
+        runners::AsyncRunner,
     };
 
     use super::ProxyClient;

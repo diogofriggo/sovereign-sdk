@@ -9,6 +9,7 @@ sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sd
 
 # EigenDA
 eigenda-cert = { git = "ssh://git@github.com/Layr-Labs/hokulea.git", rev = "efe7767dde967008de5309f44fecb72aa2ef1e54" }
+eigenda-cert-verifier = { path = "../eigenda-cert-verifier" }
 # rust-eigenda-v2-common = { version = "0.1.3" }
 # rust-eigenda-v2-client = { version = "0.1.4" }
 
@@ -26,7 +27,9 @@ alloy-signer-local = { version = "1.0.23", default-features = false }
 alloy-transport = { version = "1.0.23", default-features = false }
 
 # Reth
-reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.5.1", default-features = false }
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.5.1", default-features = false, features = [
+    "serde",
+] }
 
 # Others
 anyhow = { version = "1.0.98", default-features = false }
@@ -51,6 +54,12 @@ tracing = { version = "0.1.41" }
 url = { version = "2.5.4" }
 
 [dev-dependencies]
+alloy-provider = { version = "1.0.23", default-features = false, features = [
+    "anvil-api",
+] }
+alloy-rpc-types = { version = "1.0.23", default-features = false, features = [
+    "anvil",
+] }
 # Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk-wip/blob/b59ebb8d7576d4ce2881e49bc368b5b91076d7d5/Cargo.toml#L255
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 testcontainers = "0.24.0"
@@ -65,7 +74,6 @@ native = [
     "alloy-provider/anvil-api",
     "alloy-eips/kzg",
     # Reth
-    "reth-trie-common/serde",
     "reth-trie-common/eip1186",
     # Others
     "dep:tokio",

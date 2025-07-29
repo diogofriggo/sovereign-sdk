@@ -40,10 +40,10 @@ impl StandardCommitment {
     }
 
     /// Get reference block used when constructing this certificate.
-    pub fn reference_block(&self) -> u32 {
+    pub fn reference_block(&self) -> u64 {
         match &self.0 {
-            EigenDAVersionedCert::V2(c) => c.batch_header_v2.reference_block_number,
-            EigenDAVersionedCert::V3(c) => c.batch_header_v2.reference_block_number,
+            EigenDAVersionedCert::V2(c) => c.batch_header_v2.reference_block_number as u64,
+            EigenDAVersionedCert::V3(c) => c.batch_header_v2.reference_block_number as u64,
         }
     }
 

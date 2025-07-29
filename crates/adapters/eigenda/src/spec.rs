@@ -1,10 +1,11 @@
 use std::{hash::Hash, str::FromStr};
 
-use alloy_consensus::{Header, Transaction as TTransaction};
+use alloy_consensus::{Header, Transaction, TxEnvelope, transaction::Recovered};
 use alloy_eips::Typed2718;
-use alloy_primitives::{Address, AddressError, Bytes, FixedBytes, wrap_fixed_bytes};
-use alloy_rpc_types_eth::{Header as RpcHeader, Transaction};
+use alloy_primitives::{Address, AddressError, B256, Bytes, FixedBytes, wrap_fixed_bytes};
+use alloy_rpc_types_eth::Header as RpcHeader;
 use borsh::{BorshDeserialize, BorshSerialize};
+use reth_trie_common::{AccountProof, proof::ProofVerificationError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
@@ -13,10 +14,7 @@ use sov_rollup_interface::{
     sov_universal_wallet::UniversalWallet,
 };
 
-use crate::{
-    eigenda::types::StandardCommitment,
-    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
-};
+use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 
 /// A specification for the types used by a DA layer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
@@ -55,12 +53,14 @@ impl DaSpec for EigenDaSpec {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct RollupParams {
     /// The account to which we are storing the certificates of the batch blobs
-    pub rollup_batch_account: NamespaceId,
+    pub rollup_batch_namespace: NamespaceId,
     /// The account to which we are storing the certificates of the proof blobs
-    pub rollup_proof_account: NamespaceId,
+    pub rollup_proof_namespace: NamespaceId,
 }
 
-/// A namespace id used to identify transactions of the sequencer.
+/// A namespace id used to identify transactions of the sequencer. The namespace
+/// is a regular [`EthereumAddress`]. We say that the specific transaction is
+/// part of a namespace if the receiver equals the [`EthereumAddress`] used as a namespace.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct NamespaceId(EthereumAddress);
@@ -68,7 +68,10 @@ pub struct NamespaceId(EthereumAddress);
 impl NamespaceId {
     /// Check if namespace contains this transaction. The namespace contains
     /// transaction if the receiver of transaction is the address used as a namespace.
-    pub fn contains(&self, tx: &Transaction) -> bool {
+    pub fn contains<T>(&self, tx: &T) -> bool
+    where
+        T: Typed2718 + Transaction,
+    {
         tx.is_eip4844() && tx.to().is_some_and(|to| to == self.0.0)
     }
 }
@@ -90,6 +93,18 @@ impl FromStr for NamespaceId {
 /// An Ethereum block header containing only relevant information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthereumBlockHeader(Header);
+
+impl EthereumBlockHeader {
+    /// The function checks if **this** [`EthereumBlockHeader`] is a direct
+    /// parent to the [`EthereumBlockHeader`] passed as an argument.
+    ///
+    /// Note: The relationship is checked by hashing this header and checking it
+    /// against the parent_hash of `maybe_child`.
+    pub fn is_parent(&self, maybe_child: &EthereumBlockHeader) -> bool {
+        let our_hash = self.0.hash_slow();
+        maybe_child.0.parent_hash == our_hash
+    }
+}
 
 impl From<RpcHeader> for EthereumBlockHeader {
     fn from(header: RpcHeader) -> Self {
@@ -278,22 +293,71 @@ impl BlobReaderTrait for BlobWithSender {
     }
 }
 
-/// Struct that holds an Ethereum transaction with certificate and an actual blob
+/// Struct that holds an Ethereum transaction with an actual blob persisted
+/// to the EigenDA.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
     /// The transaction that holds a certificate
-    pub transaction: Transaction,
-    /// Blob with the data certificate
-    pub blob: Option<Blob>,
+    pub transaction: Recovered<TxEnvelope>,
+    /// The blob persisted to the EigenDA
+    pub blob: Option<Vec<u8>>,
 }
 
-/// Struct that holds a data blob and certificate.
+/// Data tracked for the specific ancestor.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Blob {
-    /// Storage certificate
-    pub certificate: StandardCommitment,
-    /// The actual blob data persisted to the EigenDa
-    pub data: Vec<u8>,
+pub struct AncestorMetadata {
+    // Header for the ancestor block.
+    pub header: EthereumBlockHeader,
+    // The data needed to validate the certificate referencing this ancestor.
+    // It's `Some` only in cases when we have a certificate that references this
+    // ancestor. If there is no certificate referencing the ancestor the data is
+    // `None`.
+    pub data: Option<AncestorStateData>,
+}
+
+/// Contains data needed to validate the certificate using the ancestor as the
+/// reference block. It also contains proofs used to verify the data.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AncestorStateData {
+    registry_coordinator: AccountProof,
+    delegation_manager: AccountProof,
+    bls_apt_registry: AccountProof,
+    stake_registry: AccountProof,
+}
+
+impl AncestorStateData {
+    pub fn new(
+        registry_coordinator: AccountProof,
+        delegation_manager: AccountProof,
+        bls_apt_registry: AccountProof,
+        stake_registry: AccountProof,
+    ) -> Self {
+        Self {
+            registry_coordinator,
+            delegation_manager,
+            bls_apt_registry,
+            stake_registry,
+        }
+    }
+
+    /// Verifies the data against the state root.
+    pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
+        self.registry_coordinator.verify(state_root)?;
+        self.delegation_manager.verify(state_root)?;
+        self.bls_apt_registry.verify(state_root)?;
+        self.stake_registry.verify(state_root)?;
+
+        Ok(())
+    }
+
+    /// Extract the data.
+    ///
+    /// NOTE: The data extracted is not verified.
+    pub fn extract(&self) -> Result<(), ()> {
+        // TODO: Extract the data from proofs to some struct used to verify the
+        // certificate. You need the correct storage keys here again.
+        todo!()
+    }
 }
 
 #[cfg(test)]
