@@ -1,6 +1,9 @@
 use std::{hash::Hash, str::FromStr};
 
-use alloy_consensus::{Header, Transaction, TxEnvelope, transaction::Recovered};
+use alloy_consensus::{
+    EthereumTxEnvelope, Header, Transaction, TxEip4844,
+    serde_bincode_compat::{self},
+};
 use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, B256, Bytes, FixedBytes, wrap_fixed_bytes};
 use alloy_rpc_types_eth::Header as RpcHeader;
@@ -8,6 +11,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use reth_trie_common::{AccountProof, proof::ProofVerificationError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use sov_rollup_interface::{
     BasicAddress,
     da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
@@ -40,13 +44,9 @@ impl DaSpec for EigenDaSpec {
     type InclusionMultiProof = EigenDaInclusionProof;
 
     /// A proof that a claimed set of transactions is complete.
-    /// For example, this could be a range proof demonstrating that
-    /// the provided BlobTransactions represent the entire contents
-    /// of Celestia namespace in a given block
     type CompletenessProof = EigenDaCompletenessProof;
 
     /// The parameters of the rollup which are baked into the state-transition function.
-    /// For example, this could include the namespace of the rollup on Celestia.
     type ChainParams = RollupParams;
 }
 
@@ -72,7 +72,7 @@ impl NamespaceId {
     where
         T: Typed2718 + Transaction,
     {
-        tx.is_eip4844() && tx.to().is_some_and(|to| to == self.0.0)
+        tx.is_eip1559() && tx.to().is_some_and(|to| to == self.0.0)
     }
 }
 
@@ -295,10 +295,12 @@ impl BlobReaderTrait for BlobWithSender {
 
 /// Struct that holds an Ethereum transaction with an actual blob persisted
 /// to the EigenDA.
+#[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
     /// The transaction that holds a certificate
-    pub transaction: Recovered<TxEnvelope>,
+    #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
+    pub transaction: EthereumTxEnvelope<TxEip4844>,
     /// The blob persisted to the EigenDA
     pub blob: Option<Vec<u8>>,
 }
@@ -310,8 +312,7 @@ pub struct AncestorMetadata {
     pub header: EthereumBlockHeader,
     // The data needed to validate the certificate referencing this ancestor.
     // It's `Some` only in cases when we have a certificate that references this
-    // ancestor. If there is no certificate referencing the ancestor the data is
-    // `None`.
+    // ancestor.
     pub data: Option<AncestorStateData>,
 }
 

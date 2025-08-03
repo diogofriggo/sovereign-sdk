@@ -1,5 +1,6 @@
 use crate::eigenda::types::StandardCommitment;
-use alloy_consensus::{SidecarCoder, SimpleCoder, TxEip4844Variant, TxEnvelope};
+use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
+use alloy_primitives::Bytes;
 
 pub trait EthereumTransactionExt {
     /// Extract certificate from the transaction. Return None if no parsable
@@ -9,32 +10,19 @@ pub trait EthereumTransactionExt {
     // Extract RLP encoded certificate from the transaction sidecar.
     //
     // NOTE: The bytes returned are not checked.
-    fn extract_certificate_rlp_unchecked(&self) -> Option<Vec<u8>>;
+    fn extract_certificate_rlp_unchecked(&self) -> Option<Bytes>;
 }
 
-impl EthereumTransactionExt for TxEnvelope {
+impl EthereumTransactionExt for EthereumTxEnvelope<TxEip4844> {
     fn extract_certificate(&self) -> Option<StandardCommitment> {
         self.extract_certificate_rlp_unchecked()
-            .map(|cert| StandardCommitment::from_rlp_bytes(cert.as_slice()).ok())
+            .map(|cert| StandardCommitment::from_rlp_bytes(&cert).ok())
             .flatten()
     }
 
-    fn extract_certificate_rlp_unchecked(&self) -> Option<Vec<u8>> {
-        // Check if this is an EIP-4844 transaction
-        let eip4844_tx = self.as_eip4844()?;
-
-        // Check if the transaction has a sidecar
-        let TxEip4844Variant::TxEip4844WithSidecar(tx_with_sidecar) = eip4844_tx.tx() else {
-            return None;
-        };
-
-        // Decode the certificate from the sidecar
-        let sidecar = &tx_with_sidecar.sidecar;
-        let decoded = SimpleCoder::default().decode_all(&sidecar.blobs)?;
-        // The certificate is small enough that only one ethereum blob is used
-        let decoded = decoded.into_iter().next()?;
-
-        Some(decoded)
+    fn extract_certificate_rlp_unchecked(&self) -> Option<Bytes> {
+        let eip4844_tx = self.as_eip1559()?;
+        Some(eip4844_tx.input().clone())
     }
 }
 

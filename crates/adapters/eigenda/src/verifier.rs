@@ -6,7 +6,7 @@ use crate::{
         EthereumHash, NamespaceId, TransactionWithBlob,
     },
 };
-use alloy_consensus::proofs::calculate_transaction_root;
+use alloy_consensus::{proofs::calculate_transaction_root, transaction::SignerRecoverable};
 use alloy_primitives::B256;
 use eigenda_cert_verifier::error::CertVerificationError;
 use reth_trie_common::proof::ProofVerificationError;
@@ -15,6 +15,7 @@ use sov_rollup_interface::da::{
     BlobReaderTrait, DaSpec, DaVerifier, RelevantBlobs, RelevantProofs,
 };
 use thiserror::Error;
+use tracing::warn;
 
 /// Errors that may occur when verifying with the [`EigenDaVerifier`].
 #[derive(Debug, Error)]
@@ -121,9 +122,6 @@ pub enum CompletenessProofError {
 
     #[error("Error occurred while verifying EigenDA certificate: {0}")]
     CertVerificationError(#[from] CertVerificationError),
-
-    #[error("Blob data missing for the certificate: {0:?}")]
-    MissingBlob(StandardCommitment),
 }
 
 /// A proof of completeness of the transactions in the block.
@@ -244,11 +242,10 @@ impl EigenDaCompletenessProof {
             }
         }
 
-        // Validate the data state of the ancestor blocks against the state_root
-        // of the header
+        // Validate the data state of the ancestor blocks
         for ancestor in &self.ancestors {
             if let Some(data) = &ancestor.data {
-                data.verify(header.as_ref().state_root)?;
+                data.verify(ancestor.header.as_ref().state_root)?;
             }
         }
 
@@ -276,7 +273,13 @@ impl EigenDaCompletenessProof {
                     self.verify_blob(header, certificate, &blob)?;
                 }
                 (Some(certificate), None) => {
-                    return Err(CompletenessProofError::MissingBlob(certificate));
+                    // This can happen in cases when the ethereum transaction
+                    // contains a valid formatted certificate that was not
+                    // recognized by the EigenDA when fetching the blob data
+                    warn!(
+                        ?certificate,
+                        "Transaction holds a certificate without a corresponding blob"
+                    );
                 }
                 (None, Some(_blob)) => {
                     // Safety: This is a logic error. The blobs are fetched
@@ -355,7 +358,7 @@ impl EigenDaInclusionProof {
         // already proven to be a complete set.
         let mut namespace_transaction_hashes = proven_transactions
             .iter()
-            .filter(|tx| namespace.contains(tx.transaction.as_ref()))
+            .filter(|tx| namespace.contains(&tx.transaction))
             .map(|tx| tx.transaction.hash());
 
         loop {
@@ -402,34 +405,38 @@ impl EigenDaInclusionProof {
         proven_transactions: &[TransactionWithBlob],
         blobs_with_senders: &[BlobWithSender],
     ) -> Result<(), InclusionProofError> {
+        // Verify transactions contained by the proof
         self.verify_transactions(namespace, proven_transactions)?;
 
         let mut blobs_with_senders = blobs_with_senders.iter();
-        let mut proven_transactions = self.transactions.iter();
+        let mut proven_relevant_transactions = self.transactions.iter().flat_map(|tx| {
+            let hash = EthereumHash::from(*tx.transaction.hash());
+            let blob = tx.blob.as_ref()?;
+
+            let sender = tx.transaction.recover_signer().ok()?;
+            let sender = EthereumAddress::from(sender);
+            Some((hash, sender, blob))
+        });
 
         // Compare proven transactions to the provided transactions represented
         // as blobs with senders
         loop {
-            let (hash, sender, blob, provided) =
-                match (proven_transactions.next(), blobs_with_senders.next()) {
-                    (Some(proven), Some(provided)) => {
-                        let hash = EthereumHash::from(*proven.transaction.hash());
-                        let signer = EthereumAddress::from(proven.transaction.signer());
-                        let blob = &proven.blob;
-                        (hash, signer, blob, provided)
-                    }
-                    // `blob_with_sender` not provided
-                    (Some(proven), None) => {
-                        let hash = proven.transaction.hash();
-                        return Err(InclusionProofError::MissingBlob(*hash));
-                    }
-                    // Missing transaction for the provided `blob_with_sender``
-                    (None, Some(provided)) => {
-                        return Err(InclusionProofError::IrrelevantBlob(*provided.hash()));
-                    }
-                    // We are finished
-                    (None, None) => break,
-                };
+            let (hash, sender, blob, provided) = match (
+                proven_relevant_transactions.next(),
+                blobs_with_senders.next(),
+            ) {
+                (Some((hash, sender, blob)), Some(provided)) => (hash, sender, blob, provided),
+                // `blob_with_sender` not provided
+                (Some((hash, ..)), None) => {
+                    return Err(InclusionProofError::MissingBlob(*hash));
+                }
+                // Missing transaction for the provided `blob_with_sender``
+                (None, Some(provided)) => {
+                    return Err(InclusionProofError::IrrelevantBlob(*provided.hash()));
+                }
+                // We are finished
+                (None, None) => break,
+            };
 
             // Check if sender is the same
             if sender != provided.sender {
@@ -447,12 +454,7 @@ impl EigenDaInclusionProof {
                 ));
             }
 
-            // Check that the blob is set in the proved transaction
-            let Some(blob) = blob else {
-                return Err(InclusionProofError::MissingBlob(*hash));
-            };
-
-            // Check if data read from rollup was correct
+            // Check if data read by the rollup was correct
             let consumed_data = provided.verified_data();
             if consumed_data.is_empty() {
                 // Nothing to check
