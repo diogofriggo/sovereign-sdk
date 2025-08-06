@@ -1,44 +1,75 @@
+use std::{str::FromStr, time::Duration};
+
+use crate::service::config::EigenDaConfig;
+
 use super::types::{StandardCommitment, StandardCommitmentParseError};
+use backon::{ExponentialBuilder, Retryable};
+use bytes::Bytes;
 use hex::encode;
-use reqwest::{IntoUrl, Url, header::CONTENT_TYPE};
+use reqwest::{Request, Url, header::CONTENT_TYPE};
 use thiserror::Error;
+use tracing::trace;
+
+/// Default maximal number of times we retry requests.
+const DEFAULT_MAX_RETRY_TIMES: u64 = 10;
+/// Default starting delay at which requests will be retried.
+const DEFAULT_MIN_RETRY_DELAY: Duration = Duration::from_millis(1000);
+/// Default maximal delay at which requests will be retried.
+const DEFAULT_MAX_RETRY_DELAY: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone)]
 pub struct ProxyClient {
+    url: Url,
     inner: reqwest::Client,
-    base_url: Url,
+    // Backoff for retrying strategy
+    backoff: Option<ExponentialBuilder>,
 }
 
 impl ProxyClient {
-    pub fn new<U>(url: U) -> Result<Self, ProxyError>
-    where
-        U: IntoUrl,
-    {
+    pub fn new(config: &EigenDaConfig) -> Result<Self, ProxyError> {
+        let min_retry_delay = config
+            .proxy_min_retry_delay
+            .map(Duration::from_millis)
+            .unwrap_or(DEFAULT_MIN_RETRY_DELAY);
+
+        let max_retry_delay = config
+            .proxy_max_retry_delay
+            .map(Duration::from_millis)
+            .unwrap_or(DEFAULT_MAX_RETRY_DELAY);
+
+        let max_retry_times = config
+            .proxy_max_retry_times
+            .unwrap_or(DEFAULT_MAX_RETRY_TIMES);
+
+        let backoff = ExponentialBuilder::default()
+            .with_min_delay(min_retry_delay)
+            .with_max_delay(max_retry_delay)
+            .with_max_times(max_retry_times as usize);
+
+        let url = Url::from_str(&config.proxy_url)?;
         let inner = reqwest::Client::builder().build()?;
 
         Ok(Self {
+            url,
             inner,
-            base_url: url.into_url()?,
+            backoff: Some(backoff),
         })
     }
 
     /// Fetch blob data for the given certificate
-    pub async fn get_blob(&self, cert: &StandardCommitment) -> Result<Vec<u8>, ProxyError> {
+    pub async fn get_blob(&self, cert: &StandardCommitment) -> Result<Bytes, ProxyError> {
         let hex = encode(cert.to_rlp_bytes());
-        let mut url = self.base_url.join(&format!("/get/0x{hex}"))?;
+        let mut url = self.url.join(&format!("/get/0x{hex}"))?;
         url.set_query(Some("commitment_mode=standard"));
 
         let request = self.inner.get(url).build()?;
-
-        let response = self.inner.execute(request).await?;
-        let response = response.bytes().await?;
-
-        Ok(response.to_vec())
+        let response = self.call(request).await?;
+        Ok(response)
     }
 
     /// Stores the new blob and returns a certificate
     pub async fn store_blob(&self, blob: &[u8]) -> Result<StandardCommitment, ProxyError> {
-        let mut url = self.base_url.join("/put")?;
+        let mut url = self.url.join("/put")?;
         url.set_query(Some("commitment_mode=standard"));
 
         let request = self
@@ -48,10 +79,43 @@ impl ProxyClient {
             .body(blob.to_vec())
             .build()?;
 
-        let response = self.inner.execute(request).await?;
-        let response = response.bytes().await?;
+        let response = self.call(request).await?;
+        let certificate = StandardCommitment::from_rlp_bytes(response.as_ref())?;
+        Ok(certificate)
+    }
 
-        Ok(StandardCommitment::from_rlp_bytes(response.as_ref())?)
+    async fn call(&self, request: Request) -> Result<Bytes, reqwest::Error> {
+        // If there is retry strategy, run with retries, otherwise just call once
+        if let Some(backoff) = self.backoff.as_ref() {
+            // The operation to be retried
+            let request = &request;
+            let operation = || async {
+                let request = request
+                    .try_clone()
+                    .expect("the body is not a stream. so the request is clone-able");
+                self.call_inner(request).await
+            };
+
+            // Notification on each retry
+            let notify = |err: &reqwest::Error, dur: Duration| {
+                trace!(?request, ?dur, "eigenda proxy error: {err}")
+            };
+
+            operation
+                .retry(backoff)
+                .when(|err| err.is_connect() || err.is_timeout())
+                .notify(notify)
+                .await
+        } else {
+            self.call_inner(request).await
+        }
+    }
+
+    async fn call_inner(&self, request: Request) -> Result<Bytes, reqwest::Error> {
+        let request = self.inner.execute(request).await?;
+        let bytes = request.bytes().await?;
+
+        Ok(bytes)
     }
 }
 
@@ -83,24 +147,3 @@ impl From<reqwest::Error> for ProxyError {
         }
     }
 }
-
-// #[cfg(test)]
-// pub mod tests {
-//     use super::ProxyClient;
-//     use crate::test_helper::eigenda::start_proxy;
-
-//     #[tokio::test]
-//     async fn blob_roundtrip() {
-//         let (proxy_url, _container) = start_proxy().await.unwrap();
-//         let proxy_client = ProxyClient::new(proxy_url).unwrap();
-//         let blob = vec![0; 1000];
-
-//         // Store the blob
-//         let certificate = proxy_client.store_blob(&blob).await.unwrap();
-
-//         // Retrieve the blob
-//         let retrieved_blob = proxy_client.get_blob(&certificate).await.unwrap();
-
-//         assert_eq!(blob, retrieved_blob);
-//     }
-// }

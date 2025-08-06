@@ -31,12 +31,15 @@ pub async fn setup_adapter(
 ) -> Result<(EigenDaService, EigenDaVerifier), EigenDaServiceError> {
     let config = EigenDaConfig {
         ethereum_rpc_url: "wss://ethereum-holesky-rpc.publicnode.com".to_string(),
+        sequencer_signer: SEQUENCER_SIGNER.to_string(),
         ethereum_compute_units: None,
         ethereum_max_retry_times: None,
         ethereum_initial_backoff: None,
         ethereum_max_cache_items: None,
         proxy_url,
-        sequencer_signer: SEQUENCER_SIGNER.to_string(),
+        proxy_min_retry_delay: None,
+        proxy_max_retry_delay: None,
+        proxy_max_retry_times: None,
         contracts: EigenDaContracts {
             registry_coordinator: EthereumAddress::from_str(REGISTRY_COORDINATOR_ADDRESS).unwrap(),
             bls_apt_registry: EthereumAddress::from_str(BLS_APK_REGISTRY_ADDRESS).unwrap(),

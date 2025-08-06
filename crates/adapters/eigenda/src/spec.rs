@@ -5,9 +5,10 @@ use alloy_consensus::{
     serde_bincode_compat::{self},
 };
 use alloy_eips::Typed2718;
-use alloy_primitives::{Address, AddressError, B256, Bytes, FixedBytes, wrap_fixed_bytes};
+use alloy_primitives::{Address, AddressError, B256, FixedBytes, wrap_fixed_bytes};
 use alloy_rpc_types_eth::Header as RpcHeader;
 use borsh::{BorshDeserialize, BorshSerialize};
+use bytes::Bytes;
 use reth_trie_common::{AccountProof, proof::ProofVerificationError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -252,7 +253,7 @@ pub struct BlobWithSender {
 }
 
 impl BlobWithSender {
-    pub fn new<Address, Hash>(sender: Address, tx_hash: Hash, blob: Vec<u8>) -> Self
+    pub fn new<Address, Hash>(sender: Address, tx_hash: Hash, blob: Bytes) -> Self
     where
         Address: Into<EthereumAddress>,
         Hash: Into<EthereumHash>,
@@ -260,7 +261,7 @@ impl BlobWithSender {
         Self {
             sender: sender.into(),
             tx_hash: tx_hash.into(),
-            blob: CountedBufReader::new(blob.into()),
+            blob: CountedBufReader::new(blob),
         }
     }
 }
@@ -302,7 +303,7 @@ pub struct TransactionWithBlob {
     #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
     pub transaction: EthereumTxEnvelope<TxEip4844>,
     /// The blob persisted to the EigenDA
-    pub blob: Option<Vec<u8>>,
+    pub blob: Option<Bytes>,
 }
 
 /// Data tracked for the specific ancestor.

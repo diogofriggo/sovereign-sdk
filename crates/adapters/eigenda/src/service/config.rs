@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 
 use crate::spec::EthereumAddress;
 
-/// Configuration for the [`EigenDaService`].
+/// Configuration for the [`crate::service::EigenDaService`].
 #[derive(Debug, JsonSchema, PartialEq)]
 pub struct EigenDaConfig {
     /// URL of the Ethereum RPC node.
@@ -22,6 +22,14 @@ pub struct EigenDaConfig {
     pub ethereum_max_cache_items: Option<u32>,
     /// URL of the EigenDA proxy node.
     pub proxy_url: String,
+    /// The initial backoff in milliseconds used when retrying EigenDA proxy
+    /// requests. It is increased on each subsequent retry.
+    pub proxy_min_retry_delay: Option<u64>,
+    /// The maximal backoff in milliseconds used when retrying EigenDA proxy requests.
+    pub proxy_max_retry_delay: Option<u64>,
+    /// The maximal number of times we retry requests to the EigenDA proxy
+    /// before returning the error.
+    pub proxy_max_retry_times: Option<u64>,
     /// Private key of the sequencer. The account with corresponding private key
     /// is used by the sequencer to persist the certificates to Ethereum.
     /// Expected private key in the HEX format.

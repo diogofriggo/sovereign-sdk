@@ -65,7 +65,6 @@ pub enum EigenDaServiceError {
 #[derive(Clone)]
 pub struct EigenDaService {
     /// Client for interacting with the EigenDA proxy node
-    // TODO: Add retrying strategy
     proxy: ProxyClient,
     /// Provider for interacting with an Ethereum node
     ethereum: EthereumProviders,
@@ -95,8 +94,7 @@ impl EigenDaService {
         let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)
             .map_err(|err| EigenDaServiceError::Configuration(err.to_string()))?;
         let ethereum = init_ethereum_provider(&config, sequencer_signer.clone()).await?;
-
-        let proxy = ProxyClient::new(config.proxy_url)?;
+        let proxy = ProxyClient::new(&config)?;
 
         Ok(Self {
             proxy,
@@ -504,7 +502,7 @@ impl DaService for EigenDaService {
 pub struct EthereumBlock {
     /// List of ancestor blocks. The first ancestor in a list is the earliest
     /// reference block from which the values for certificate creation were
-    /// sourced. The last header in a list is a parent of this block.
+    /// sourced. The last header in the list is a parent of this block.
     pub ancestors: Vec<AncestorMetadata>,
     /// The current block header.
     pub header: EthereumBlockHeader,
