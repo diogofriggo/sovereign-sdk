@@ -1,3 +1,6 @@
+#[cfg(feature = "native")]
+pub mod provider;
+
 use crate::eigenda::types::StandardCommitment;
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 use alloy_primitives::Bytes;

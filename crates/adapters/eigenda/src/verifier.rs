@@ -398,7 +398,14 @@ impl EigenDaInclusionProof {
     /// `blobs_with_senders` list. Each transaction is checked for data and
     /// sender equality, in order they appear.
     ///
-    /// TODO: Add errors that can happen
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    ///   - there is an extra `BlobWithSender` provided which wasn't found in the block
+    ///   - the list of provided `BlobWithSender`s is not complete, there are more in the block
+    ///   - provided sender is different from the one in the proven transaction
+    ///   - provided hash is different from the hash of the proven transaction
+    ///   - provided blob data is different from the blob retrieved and proven to be part of the transaction
     pub fn verify(
         &self,
         namespace: NamespaceId,

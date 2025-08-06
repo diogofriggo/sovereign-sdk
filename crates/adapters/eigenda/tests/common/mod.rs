@@ -29,10 +29,12 @@ pub static SERVICE_MANAGER_ADDRESS: &str = "0xD4A7E1Bd8015057293f0D0A557088c2869
 pub async fn setup_adapter(
     proxy_url: String,
 ) -> Result<(EigenDaService, EigenDaVerifier), EigenDaServiceError> {
-    let ethereum_rpc_url = "wss://ethereum-holesky-rpc.publicnode.com".to_string();
-
     let config = EigenDaConfig {
-        ethereum_rpc_url,
+        ethereum_rpc_url: "wss://ethereum-holesky-rpc.publicnode.com".to_string(),
+        ethereum_compute_units: None,
+        ethereum_max_retry_times: None,
+        ethereum_initial_backoff: None,
+        ethereum_max_cache_items: None,
         proxy_url,
         sequencer_signer: SEQUENCER_SIGNER.to_string(),
         contracts: EigenDaContracts {
