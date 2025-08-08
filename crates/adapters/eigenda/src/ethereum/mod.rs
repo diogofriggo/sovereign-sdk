@@ -3,30 +3,16 @@ pub mod provider;
 
 use crate::eigenda::types::StandardCommitment;
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
-use alloy_primitives::Bytes;
 
-pub trait EthereumTransactionExt {
-    /// Extract certificate from the transaction. Return None if no parsable
-    /// certificate exists.
-    fn extract_certificate(&self) -> Option<StandardCommitment>;
+/// Extract certificate from the transaction. Return None if no parsable
+/// certificate exists.
+pub fn extract_certificate(
+    transaction: &EthereumTxEnvelope<TxEip4844>,
+) -> Option<StandardCommitment> {
+    let eip4844_tx = transaction.as_eip1559()?;
+    let raw_cert = eip4844_tx.input();
 
-    // Extract RLP encoded certificate from the transaction sidecar.
-    //
-    // NOTE: The bytes returned are not checked.
-    fn extract_certificate_rlp_unchecked(&self) -> Option<Bytes>;
-}
-
-impl EthereumTransactionExt for EthereumTxEnvelope<TxEip4844> {
-    fn extract_certificate(&self) -> Option<StandardCommitment> {
-        self.extract_certificate_rlp_unchecked()
-            .map(|cert| StandardCommitment::from_rlp_bytes(&cert).ok())
-            .flatten()
-    }
-
-    fn extract_certificate_rlp_unchecked(&self) -> Option<Bytes> {
-        let eip4844_tx = self.as_eip1559()?;
-        Some(eip4844_tx.input().clone())
-    }
+    StandardCommitment::from_rlp_bytes(&raw_cert).ok()
 }
 
 #[cfg(test)]

@@ -56,9 +56,9 @@ impl ProxyClient {
         })
     }
 
-    /// Fetch blob data for the given certificate
-    pub async fn get_blob(&self, cert: &StandardCommitment) -> Result<Bytes, ProxyError> {
-        let hex = encode(cert.to_rlp_bytes());
+    /// Fetch blob data for the given certificate.
+    pub async fn get_blob(&self, certificate: &StandardCommitment) -> Result<Bytes, ProxyError> {
+        let hex = encode(certificate.to_rlp_bytes());
         let mut url = self.url.join(&format!("/get/0x{hex}"))?;
         url.set_query(Some("commitment_mode=standard"));
 

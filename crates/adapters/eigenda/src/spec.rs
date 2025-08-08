@@ -19,7 +19,10 @@ use sov_rollup_interface::{
     sov_universal_wallet::UniversalWallet,
 };
 
-use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
+use crate::{
+    service::StandardCommitment,
+    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
+};
 
 /// A specification for the types used by a DA layer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
@@ -352,12 +355,13 @@ impl AncestorStateData {
         Ok(())
     }
 
-    /// Extract the data.
+    /// Extract the data that this ancestor contains.
     ///
-    /// NOTE: The data extracted is not verified.
-    pub fn extract(&self) -> Result<(), ()> {
-        // TODO: Extract the data from proofs to some struct used to verify the
-        // certificate. You need the correct storage keys here again.
+    /// NOTE: The data extracted is not verified. To verify the data, ensure
+    /// that the [`AncestorStateData::verify`] is called.
+    pub fn extract(&self, _certificate: &StandardCommitment) -> Result<(), ()> {
+        // TODO: Extract the data from `AccountProof`s to some struct used to
+        // verify the certificate. You need the correct storage keys here again.
         todo!()
     }
 }

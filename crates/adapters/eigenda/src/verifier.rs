@@ -1,6 +1,6 @@
 use crate::{
     eigenda::types::StandardCommitment,
-    ethereum::EthereumTransactionExt,
+    ethereum::extract_certificate,
     spec::{
         AncestorMetadata, BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
         EthereumHash, NamespaceId, TransactionWithBlob,
@@ -117,6 +117,9 @@ pub enum CompletenessProofError {
     #[error("Certificate mismatch")]
     CertificateMismatch,
 
+    #[error("Blob missing for certificate ({0:?})")]
+    MissingBlob(StandardCommitment),
+
     #[error("Error occurred while verifying the Ethereum account proof: {0}")]
     ProofVerificationError(#[from] ProofVerificationError),
 
@@ -169,13 +172,12 @@ impl EigenDaCompletenessProof {
         Some(&self.ancestors[index])
     }
 
-    /// Verify certificate against the data from the specific ancestor and
-    /// verify data blob against the verified certificate.
-    fn verify_blob(
+    /// Verify the certificate using the data from specific ancestor that was
+    /// used as a reference when constructing the certificate.
+    fn verify_certificate(
         &self,
         header: &EthereumBlockHeader,
-        certificate: StandardCommitment,
-        blob: &[u8],
+        certificate: &StandardCommitment,
     ) -> Result<(), CompletenessProofError> {
         // Get the referenced ancestor by the certificate. If this returns
         // an error it means there must be a logic error when prefilling the
@@ -189,10 +191,20 @@ impl EigenDaCompletenessProof {
             .as_ref()
             .ok_or_else(|| CompletenessProofError::AncestorDataMissing(referenced_height))?;
 
-        // TODO: Verify the certificate.
+        // TODO: Verify the certificate using the data stored by the ancestor
+        // let _cert_referenced_data = ancestor.extract(&certificate);
 
-        // TODO: We also need to verify the `blob` against the
-        // certificate. Doing that we have a full validated chain of data.
+        Ok(())
+    }
+
+    /// Verify blob validity against the certificate.
+    fn verify_blob(
+        &self,
+        _certificate: &StandardCommitment,
+        _blob: &[u8],
+    ) -> Result<(), CompletenessProofError> {
+        // TODO: Verify the blob against the certificate. Doing that we have a
+        // full validated chain of data.
 
         Ok(())
     }
@@ -263,23 +275,36 @@ impl EigenDaCompletenessProof {
             ));
         }
 
-        // Validate the EigenDA certificates and data blobs
+        // Validate the EigenDA certificates and corresponding data blobs
         for tx_with_blob in &self.transactions {
-            let certificate = tx_with_blob.transaction.extract_certificate();
+            let certificate = extract_certificate(&tx_with_blob.transaction);
 
             match (certificate, &tx_with_blob.blob) {
+                // A normal case. Verify certificate and blob
                 (Some(certificate), Some(blob)) => {
-                    // Verify certificate and blob
-                    self.verify_blob(header, certificate, &blob)?;
+                    self.verify_certificate(header, &certificate)?;
+                    self.verify_blob(&certificate, blob)?;
                 }
+                // This happens in cases when the blob couldn't be retrieved
+                // from the EigenDA, but there was some certificate in the
+                // transaction.
                 (Some(certificate), None) => {
-                    // This can happen in cases when the ethereum transaction
-                    // contains a valid formatted certificate that was not
-                    // recognized by the EigenDA when fetching the blob data
-                    warn!(
-                        ?certificate,
-                        "Transaction holds a certificate without a corresponding blob"
-                    );
+                    match self.verify_certificate(header, &certificate) {
+                        // The certificate is valid and the blob is missing.
+                        Ok(_) => {
+                            return Err(CompletenessProofError::MissingBlob(certificate));
+                        }
+                        // The certificate is invalid. Which means that the
+                        // certificate in the transaction was malformed or malicious.
+                        Err(err) => {
+                            warn!(
+                                ?certificate,
+                                ?err,
+                                "Transaction contained a malformed certificate. Ignoring."
+                            );
+                            continue;
+                        }
+                    }
                 }
                 (None, Some(_blob)) => {
                     // Safety: This is a logic error. The blobs are fetched
