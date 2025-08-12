@@ -1,10 +1,8 @@
 use sov_rollup_interface::da::BlockHeaderTrait;
 use thiserror::Error;
 
-use crate::{
-    service::StandardCommitment,
-    spec::{AncestorMetadata, EthereumBlockHeader},
-};
+use super::types::StandardCommitment;
+use crate::spec::{AncestorMetadata, EthereumBlockHeader};
 
 #[derive(Debug, Error)]
 pub enum CertificateVerificationError {

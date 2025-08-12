@@ -20,7 +20,7 @@ use sov_rollup_interface::{
 };
 
 use crate::{
-    service::StandardCommitment,
+    eigenda::types::StandardCommitment,
     verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
 };
 

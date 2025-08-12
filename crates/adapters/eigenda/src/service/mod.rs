@@ -1,6 +1,6 @@
 pub mod config;
 
-pub use crate::eigenda::types::{StandardCommitment, StandardCommitmentParseError};
+use crate::eigenda::types::StandardCommitment;
 use crate::eigenda::validation::{verify_cert, verify_cert_recency};
 use crate::ethereum::extract_certificate;
 use crate::ethereum::provider::{EthereumProviders, init_ethereum_provider};
