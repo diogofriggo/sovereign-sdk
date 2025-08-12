@@ -1,7 +1,7 @@
 #[cfg(feature = "native")]
 pub mod provider;
 
-use crate::eigenda::types::StandardCommitment;
+use crate::{eigenda::types::StandardCommitment, spec::AncestorMetadata};
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 
 /// Extract certificate from the transaction. Return None if no parsable
@@ -13,6 +13,33 @@ pub fn extract_certificate(
     let raw_cert = eip4844_tx.input();
 
     StandardCommitment::from_rlp_bytes(&raw_cert).ok()
+}
+
+/// Get the [`AncestorMetadata`] for the specific referenced block. The
+/// `ancestors` are expected to be a contiguous chain of ancestors preceding the
+/// `current_height`.
+pub fn get_ancestor(
+    ancestors: &[AncestorMetadata],
+    current_height: u64,
+    referenced_height: u64,
+) -> Option<&AncestorMetadata> {
+    // Check that the referenced height is always smaller from the current_height
+    if current_height <= referenced_height {
+        return None;
+    }
+
+    // Safety: We know that the referenced_height is always smaller from current_height.
+    let diff = current_height - referenced_height;
+    let ancestors_len = ancestors.len() as u64;
+
+    // Check that the referenced height is in the vector
+    if ancestors_len < diff {
+        return None;
+    }
+
+    // Safety: We know that the `diff` <= `ancestors_len`
+    let index = (ancestors_len - diff) as usize;
+    Some(&ancestors[index])
 }
 
 #[cfg(test)]

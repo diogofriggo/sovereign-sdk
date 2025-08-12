@@ -60,6 +60,10 @@ pub struct RollupParams {
     pub rollup_batch_namespace: NamespaceId,
     /// The account to which we are storing the certificates of the proof blobs
     pub rollup_proof_namespace: NamespaceId,
+    /// A cert is considered valid when it is included onchain before the cert's ReferenceBlockNumber (RBN) + the cert's CPW (Cert punctuality window).
+    ///
+    /// https://docs.eigencloud.xyz/products/eigenda/integrations-guides/rollup-guides/glossary#cert-punctuality-window
+    pub cert_recency_window: u64,
 }
 
 /// A namespace id used to identify transactions of the sequencer. The namespace
@@ -302,10 +306,10 @@ impl BlobReaderTrait for BlobWithSender {
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
-    /// The transaction that holds a certificate
+    /// The transaction that holds a certificate.
     #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
-    pub transaction: EthereumTxEnvelope<TxEip4844>,
-    /// The blob persisted to the EigenDA
+    pub tx: EthereumTxEnvelope<TxEip4844>,
+    /// The blob persisted to the EigenDA.
     pub blob: Option<Bytes>,
 }
 

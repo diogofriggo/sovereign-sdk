@@ -50,6 +50,7 @@ pub async fn setup_adapter(
     let params = RollupParams {
         rollup_batch_namespace: NamespaceId::from_str(ROLLUP_BATCH_NAMESPACE).unwrap(),
         rollup_proof_namespace: NamespaceId::from_str(ROLLUP_PROOF_NAMESPACE).unwrap(),
+        cert_recency_window: 3600,
     };
 
     let service = EigenDaService::new(config, params).await?;

@@ -1,6 +1,7 @@
 pub mod config;
 
 pub use crate::eigenda::types::{StandardCommitment, StandardCommitmentParseError};
+use crate::eigenda::validation::{verify_cert, verify_cert_recency};
 use crate::ethereum::extract_certificate;
 use crate::ethereum::provider::{EthereumProviders, init_ethereum_provider};
 use crate::service::config::{EigenDaConfig, EigenDaContracts};
@@ -75,6 +76,8 @@ pub struct EigenDaService {
     rollup_batch_namespace: NamespaceId,
     /// The account to which we are storing the certificates of the proof blobs
     rollup_proof_namespace: NamespaceId,
+    /// Cert recency window
+    cert_recency_window: u64,
     /// Private key of the sequencer. It is used to sign the transactions
     /// persisting the certificates to Ethereum
     sequencer_signer: PrivateKeySigner,
@@ -104,6 +107,7 @@ impl EigenDaService {
             ethereum,
             rollup_batch_namespace: params.rollup_batch_namespace,
             rollup_proof_namespace: params.rollup_proof_namespace,
+            cert_recency_window: params.cert_recency_window,
             sequencer_signer,
             contracts: config.contracts,
         })
@@ -159,58 +163,72 @@ impl EigenDaService {
 
     async fn process_transactions_with_metadata(
         &self,
+        header: &EthereumBlockHeader,
         transactions: Vec<Transaction>,
     ) -> Result<Vec<(TransactionWithBlob, Option<AncestorMetadata>)>, EigenDaServiceError> {
         let mut block_transactions = Vec::with_capacity(transactions.len());
 
         for transaction in transactions {
-            let transaction = transaction.into_inner().map_eip4844(|a| TxEip4844::from(a));
+            let tx = transaction.into_inner().map_eip4844(|a| TxEip4844::from(a));
 
             // Transaction is not relevant for the rollup. We still need it for
             // later when proving the completeness
-            if self.rollup_batch_namespace.contains(&transaction).not()
-                && self.rollup_proof_namespace.contains(&transaction).not()
+            if self.rollup_batch_namespace.contains(&tx).not()
+                && self.rollup_proof_namespace.contains(&tx).not()
             {
-                block_transactions.push((
-                    TransactionWithBlob {
-                        transaction,
-                        blob: None,
-                    },
-                    None,
-                ));
+                block_transactions.push((TransactionWithBlob { tx, blob: None }, None));
                 continue;
             }
 
             // Certificate is malformed
-            let Some(certificate) = extract_certificate(&transaction) else {
+            let Some(certificate) = extract_certificate(&tx) else {
+                block_transactions.push((TransactionWithBlob { tx, blob: None }, None));
+                continue;
+            };
+
+            // Verify certificate recency
+            if let Err(err) = verify_cert_recency(header, &certificate, self.cert_recency_window) {
+                warn!(
+                    ?header,
+                    ?certificate,
+                    ?err,
+                    "Certificate recency verification failed. Ignoring."
+                );
                 block_transactions.push((
-                    TransactionWithBlob {
-                        transaction,
-                        blob: None,
-                    },
+                    TransactionWithBlob { tx, blob: None },
+                    // We don't need to store an ancestor to prove that the
+                    // certificate recency is invalid.
                     None,
                 ));
                 continue;
             };
 
-            // TODO: Add a limit of reference block depth after which the
-            // certificate is ignored. This is prevention so that the attacker can't
-            // force the sequencer to fetch a long ancestry chain history.
-            //
-            // Note: Have in mind that the completeness proof will still contain the
-            // certificate. Which is why we should also handle it there. Hmm. What
-            // would be the right approach for handling this case?
+            // Verify the certificate against the ancestor referenced
             let ancestor = self.fetch_referenced_ancestor(&certificate).await?;
-
-            let blob = match self.proxy.get_blob(&certificate).await {
-                Ok(blob) => Some(blob),
-                Err(err) => {
-                    error!(?certificate, ?err, "Couldn't retrieve blob from EigenDa");
-                    None
-                }
+            if let Err(err) = verify_cert(&ancestor, &certificate) {
+                warn!(
+                    ?header,
+                    ?certificate,
+                    ?err,
+                    "Certificate verification failed. Ignoring."
+                );
+                block_transactions.push((
+                    TransactionWithBlob { tx, blob: None },
+                    // We need the ancestor for the invalid certificate so that
+                    // we can prove that the certificate is really invalid and
+                    // that was the reason we skipped it.
+                    Some(ancestor),
+                ));
+                continue;
             };
 
-            let transaction = TransactionWithBlob { transaction, blob };
+            // The blob should always be available for the valid certificate
+            let blob = self.proxy.get_blob(&certificate).await?;
+
+            let transaction = TransactionWithBlob {
+                tx,
+                blob: Some(blob),
+            };
             block_transactions.push((transaction, Some(ancestor)));
         }
 
@@ -407,7 +425,7 @@ impl DaService for EigenDaService {
 
         // Iterate over transactions in the block and fetch sequencer relevant data
         let transactions_with_ancestors = self
-            .process_transactions_with_metadata(block.into_transactions_vec())
+            .process_transactions_with_metadata(&header, block.into_transactions_vec())
             .await?;
         let (transactions, ancestors): (_, Vec<_>) =
             transactions_with_ancestors.into_iter().unzip();
@@ -557,8 +575,8 @@ impl EthereumBlock {
             .iter()
             .filter_map(|tx| {
                 namespace
-                    .contains(&tx.transaction)
-                    .then(|| tx.blob.clone().map(|blob| (&tx.transaction, blob)))
+                    .contains(&tx.tx)
+                    .then(|| tx.blob.clone().map(|blob| (&tx.tx, blob)))
                     .flatten()
             })
             .filter_map(|(tx, blob)| {
@@ -579,7 +597,7 @@ impl EthereumBlock {
         let maybe_relevant_txs = self
             .transactions
             .iter()
-            .filter(|tx| namespace.contains(&tx.transaction))
+            .filter(|tx| namespace.contains(&tx.tx))
             .cloned()
             .collect();
 
