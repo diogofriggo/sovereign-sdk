@@ -9,6 +9,8 @@ use alloy_primitives::{Address, AddressError, B256, FixedBytes, wrap_fixed_bytes
 use alloy_rpc_types_eth::Header as RpcHeader;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
+use eigenda_cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
+use eigenda_cert_verifier::types::{Storage, solidity::SecurityThresholds};
 use reth_trie_common::{AccountProof, proof::ProofVerificationError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,10 +21,17 @@ use sov_rollup_interface::{
     sov_universal_wallet::UniversalWallet,
 };
 
-use crate::{
-    eigenda::types::StandardCommitment,
-    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
+use crate::eigenda::{
+    extraction::{
+        ApkHistoryExtractor, DataDecoder, ExtractionError, MinWithdrawalDelayBlocksExtractor,
+        OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
+        QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
+        RelayKeyToRelayInfoExtractor, SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor,
+        TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
+    },
+    types::StandardCommitment,
 };
+use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 
 /// A specification for the types used by a DA layer.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
@@ -301,8 +310,8 @@ impl BlobReaderTrait for BlobWithSender {
     }
 }
 
-/// Struct that holds an Ethereum transaction with an actual blob persisted
-/// to the EigenDA.
+/// Struct that holds an Ethereum transaction with an actual blob
+/// persisted to EigenDA
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
@@ -328,33 +337,48 @@ pub struct AncestorMetadata {
 /// reference block. It also contains proofs used to verify the data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AncestorStateData {
+    eigen_da_relay_registry: AccountProof,
+    eigen_da_threshold_registry: AccountProof,
     registry_coordinator: AccountProof,
+    bls_signature_checker: AccountProof,
     delegation_manager: AccountProof,
-    bls_apt_registry: AccountProof,
+    bls_apk_registry: AccountProof,
     stake_registry: AccountProof,
+    eigen_da_cert_verifier: AccountProof,
 }
 
 impl AncestorStateData {
     pub fn new(
+        eigen_da_relay_registry: AccountProof,
+        eigen_da_threshold_registry: AccountProof,
         registry_coordinator: AccountProof,
+        bls_signature_checker: AccountProof,
         delegation_manager: AccountProof,
-        bls_apt_registry: AccountProof,
+        bls_apk_registry: AccountProof,
         stake_registry: AccountProof,
+        eigen_da_cert_verifier: AccountProof,
     ) -> Self {
         Self {
+            eigen_da_relay_registry,
+            eigen_da_threshold_registry,
             registry_coordinator,
+            bls_signature_checker,
             delegation_manager,
-            bls_apt_registry,
+            bls_apk_registry,
             stake_registry,
+            eigen_da_cert_verifier,
         }
     }
 
-    /// Verifies the data against the state root.
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
+        self.eigen_da_relay_registry.verify(state_root)?;
+        self.eigen_da_threshold_registry.verify(state_root)?;
         self.registry_coordinator.verify(state_root)?;
+        self.bls_signature_checker.verify(state_root)?;
         self.delegation_manager.verify(state_root)?;
-        self.bls_apt_registry.verify(state_root)?;
+        self.bls_apk_registry.verify(state_root)?;
         self.stake_registry.verify(state_root)?;
+        self.eigen_da_cert_verifier.verify(state_root)?;
 
         Ok(())
     }
@@ -363,11 +387,85 @@ impl AncestorStateData {
     ///
     /// NOTE: The data extracted is not verified. To verify the data, ensure
     /// that the [`AncestorStateData::verify`] is called.
-    pub fn extract(&self, _certificate: &StandardCommitment) -> Result<(), ()> {
-        // TODO: Extract the data from `AccountProof`s to some struct used to
-        // verify the certificate. You need the correct storage keys here again.
-        todo!()
+    pub fn extract(
+        &self,
+        cert: &StandardCommitment,
+        current_block: u32,
+    ) -> Result<CertVerificationInputs, ExtractionError> {
+        // TODO: can we make the association (to contract) type safe?
+
+        let quorum_count = QuorumCountExtractor::new(cert)
+            .decode_data(&self.registry_coordinator.storage_proofs)?;
+
+        let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new(cert)
+            .decode_data(&self.bls_signature_checker.storage_proofs)?;
+
+        let min_withdrawal_delay_blocks = MinWithdrawalDelayBlocksExtractor::new(cert)
+            .decode_data(&self.delegation_manager.storage_proofs)?;
+
+        let quorum_bitmap_history = OperatorBitmapHistoryExtractor::new(cert)
+            .decode_data(&self.registry_coordinator.storage_proofs)?;
+
+        let operator_stake_history = OperatorStakeHistoryExtractor::new(cert)
+            .decode_data(&self.stake_registry.storage_proofs)?;
+
+        let total_stake_history = TotalStakeHistoryExtractor::new(cert)
+            .decode_data(&self.stake_registry.storage_proofs)?;
+
+        let apk_history =
+            ApkHistoryExtractor::new(cert).decode_data(&self.bls_apk_registry.storage_proofs)?;
+
+        let quorum_update_block_number = QuorumUpdateBlockNumberExtractor::new(cert)
+            .decode_data(&self.registry_coordinator.storage_proofs)?;
+
+        let relay_key_to_relay_address = RelayKeyToRelayInfoExtractor::new(cert)
+            .decode_data(&self.eigen_da_relay_registry.storage_proofs)?;
+
+        let versioned_blob_params = VersionedBlobParamsExtractor::new(cert)
+            .decode_data(&self.eigen_da_threshold_registry.storage_proofs)?;
+
+        let storage = Storage {
+            quorum_count,
+            current_block,
+            stale_stakes_forbidden,
+            min_withdrawal_delay_blocks,
+            quorum_bitmap_history,
+            operator_stake_history,
+            total_stake_history,
+            apk_history,
+            quorum_update_block_number,
+            relay_key_to_relay_address,
+            versioned_blob_params,
+        };
+
+        let security_thresholds = SecurityThresholdsV2Extractor::new(cert)
+            .decode_data(&self.eigen_da_cert_verifier.storage_proofs)?;
+
+        let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new(cert)
+            .decode_data(&self.eigen_da_cert_verifier.storage_proofs)?;
+
+        let inputs = CertVerificationInputs {
+            batch_header: cert.batch_header_v2().clone(),
+            blob_inclusion_info: cert.blob_inclusion_info().clone(),
+            non_signer_stakes_and_signature: cert.nonsigner_stake_and_signature().clone(),
+            security_thresholds,
+            required_quorum_numbers,
+            signed_quorum_numbers: cert.signed_quorum_numbers().clone(),
+            storage,
+        };
+
+        Ok(inputs)
     }
+}
+
+pub struct CertVerificationInputs {
+    pub batch_header: BatchHeaderV2,
+    pub blob_inclusion_info: BlobInclusionInfo,
+    pub non_signer_stakes_and_signature: NonSignerStakesAndSignature,
+    pub security_thresholds: SecurityThresholds,
+    pub required_quorum_numbers: alloy_primitives::Bytes,
+    pub signed_quorum_numbers: alloy_primitives::Bytes,
+    pub storage: Storage,
 }
 
 #[cfg(test)]

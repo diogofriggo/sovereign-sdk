@@ -36,11 +36,13 @@ pub fn verify_cert_recency(
 ///
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation
 pub fn verify_cert(
+    _header: &EthereumBlockHeader,
     _ancestor: &AncestorMetadata,
     _cert: &StandardCommitment,
 ) -> Result<(), CertificateVerificationError> {
+    let _current_block = _header.height() as u32;
     // TODO: Verify the certificate against the ancestor
-    // let _cert_referenced_data = ancestor.extract(&cert);
+    // let _cert_referenced_data = ancestor.extract(&cert, current_block);
 
     Ok(())
 }

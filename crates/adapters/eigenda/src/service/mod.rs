@@ -1,5 +1,6 @@
 pub mod config;
 
+use crate::eigenda::extraction::contract;
 use crate::eigenda::types::StandardCommitment;
 use crate::eigenda::validation::{verify_cert, verify_cert_recency};
 use crate::ethereum::extract_certificate;
@@ -18,12 +19,12 @@ use alloy_consensus::transaction::SignerRecoverable;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
 use alloy_provider::Provider;
-use alloy_rpc_types_eth::Transaction;
 use alloy_rpc_types_eth::TransactionRequest;
+use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction};
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
-use futures::future::{Either, try_join4};
+use futures::future::{Either, try_join_all};
 use futures::{StreamExt, TryStreamExt, stream};
 use reth_trie_common::AccountProof;
 use serde::{Deserialize, Serialize};
@@ -181,16 +182,16 @@ impl EigenDaService {
             }
 
             // Certificate is malformed
-            let Some(certificate) = extract_certificate(&tx) else {
+            let Some(cert) = extract_certificate(&tx) else {
                 block_transactions.push((TransactionWithBlob { tx, blob: None }, None));
                 continue;
             };
 
             // Verify certificate recency
-            if let Err(err) = verify_cert_recency(header, &certificate, self.cert_recency_window) {
+            if let Err(err) = verify_cert_recency(header, &cert, self.cert_recency_window) {
                 warn!(
                     ?header,
-                    ?certificate,
+                    ?cert,
                     ?err,
                     "Certificate recency verification failed. Ignoring."
                 );
@@ -204,11 +205,11 @@ impl EigenDaService {
             };
 
             // Verify the certificate against the ancestor referenced
-            let ancestor = self.fetch_referenced_ancestor(&certificate).await?;
-            if let Err(err) = verify_cert(&ancestor, &certificate) {
+            let ancestor = self.fetch_referenced_ancestor(&cert).await?;
+            if let Err(err) = verify_cert(header, &ancestor, &cert) {
                 warn!(
                     ?header,
-                    ?certificate,
+                    ?cert,
                     ?err,
                     "Certificate verification failed. Ignoring."
                 );
@@ -223,7 +224,7 @@ impl EigenDaService {
             };
 
             // The blob should always be available for the valid certificate
-            let blob = self.proxy.get_blob(&certificate).await?;
+            let blob = self.proxy.get_blob(&cert).await?;
 
             let transaction = TransactionWithBlob {
                 tx,
@@ -321,54 +322,104 @@ impl EigenDaService {
     async fn fetch_ancestor_state(
         &self,
         block_height: u64,
-        _certificate: &StandardCommitment,
+        cert: &StandardCommitment,
     ) -> Result<AncestorStateData, EigenDaServiceError> {
-        // TODO: Specify correct storage keys
+        let keys = contract::EigenDaRelayRegistry::storage_keys(cert);
+        let eigen_da_relay_registry_fut = self
+            .ethereum
+            .cached
+            .get_proof(self.contracts.eigen_da_relay_registry.into(), keys)
+            .number(block_height)
+            .into_future();
+
+        let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
+        let eigen_da_threshold_registry_fut = self
+            .ethereum
+            .cached
+            .get_proof(self.contracts.eigen_da_threshold_registry.into(), keys)
+            .number(block_height)
+            .into_future();
+
+        let keys = contract::RegistryCoordinator::storage_keys(cert);
         let registry_coordinator_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.registry_coordinator.into(), vec![])
+            .get_proof(self.contracts.registry_coordinator.into(), keys)
             .number(block_height)
             .into_future();
 
-        // TODO: Specify correct storage keys
+        let keys = contract::BlsSignatureChecker::storage_keys(cert);
+        let bls_signature_checker_fut = self
+            .ethereum
+            .cached
+            .get_proof(self.contracts.bls_signature_checker.into(), keys)
+            .number(block_height)
+            .into_future();
+
+        let keys = contract::DelegationManager::storage_keys(cert);
         let delegation_manager_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.delegation_manager.into(), vec![])
+            .get_proof(self.contracts.delegation_manager.into(), keys)
             .number(block_height)
             .into_future();
 
-        // TODO: Specify correct storage keys
-        let bls_apt_registry_fut = self
+        let keys = contract::BlsApkRegistry::storage_keys(cert);
+        let bls_apk_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.bls_apt_registry.into(), vec![])
+            .get_proof(self.contracts.bls_apk_registry.into(), keys)
             .number(block_height)
             .into_future();
 
-        // TODO: Specify correct storage keys
+        let keys = contract::StakeRegistry::storage_keys(cert);
         let stake_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.stake_registry.into(), vec![])
+            .get_proof(self.contracts.stake_registry.into(), keys)
             .number(block_height)
             .into_future();
 
-        let (registry_coordinator, delegation_manager, bls_apt_registry, stake_registry) =
-            try_join4(
-                registry_coordinator_fut,
-                delegation_manager_fut,
-                bls_apt_registry_fut,
-                stake_registry_fut,
-            )
-            .await?;
+        let keys = contract::EigenDaCertVerifier::storage_keys(cert);
+        let eigen_da_cert_verifier_fut = self
+            .ethereum
+            .cached
+            .get_proof(self.contracts.eigen_da_cert_verifier.into(), keys)
+            .number(block_height)
+            .into_future();
+
+        let responses = try_join_all([
+            eigen_da_relay_registry_fut,
+            eigen_da_threshold_registry_fut,
+            registry_coordinator_fut,
+            bls_signature_checker_fut,
+            delegation_manager_fut,
+            bls_apk_registry_fut,
+            stake_registry_fut,
+            eigen_da_cert_verifier_fut,
+        ])
+        .await?;
+
+        let [
+            eigen_da_relay_registry,
+            eigen_da_threshold_registry,
+            registry_coordinator,
+            bls_signature_checker,
+            delegation_manager,
+            bls_apk_registry,
+            stake_registry,
+            eigen_da_cert_verifier,
+        ]: [EIP1186AccountProofResponse; 8] = responses.try_into().expect("Expected 8 elements");
 
         Ok(AncestorStateData::new(
+            AccountProof::from(eigen_da_relay_registry),
+            AccountProof::from(eigen_da_threshold_registry),
             AccountProof::from(registry_coordinator),
+            AccountProof::from(bls_signature_checker),
             AccountProof::from(delegation_manager),
-            AccountProof::from(bls_apt_registry),
+            AccountProof::from(bls_apk_registry),
             AccountProof::from(stake_registry),
+            AccountProof::from(eigen_da_cert_verifier),
         ))
     }
 }

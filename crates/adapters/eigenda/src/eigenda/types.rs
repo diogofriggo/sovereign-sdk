@@ -1,5 +1,9 @@
+use alloy_primitives::{B256, Bytes};
 use alloy_rlp::{Decodable, Encodable, Error};
-use eigenda_cert::{EigenDACertV2, EigenDACertV3, EigenDAVersionedCert};
+use eigenda_cert::{
+    BatchHeaderV2, BlobInclusionInfo, EigenDACertV2, EigenDACertV3, EigenDAVersionedCert,
+    NonSignerStakesAndSignature,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -61,6 +65,122 @@ impl StandardCommitment {
         }
 
         bytes
+    }
+
+    pub fn relay_keys(&self) -> &[u32] {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => &cert.blob_inclusion_info.blob_certificate.relay_keys,
+            EigenDAVersionedCert::V3(cert) => &cert.blob_inclusion_info.blob_certificate.relay_keys,
+        }
+    }
+
+    pub fn version(&self) -> u16 {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                cert.blob_inclusion_info
+                    .blob_certificate
+                    .blob_header
+                    .version
+            }
+            EigenDAVersionedCert::V3(cert) => {
+                cert.blob_inclusion_info
+                    .blob_certificate
+                    .blob_header
+                    .version
+            }
+        }
+    }
+
+    pub fn non_signers_pk_hashes(&self) -> Vec<B256> {
+        let pks = match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                cert.nonsigner_stake_and_signature.non_signer_pubkeys.iter()
+            }
+            EigenDAVersionedCert::V3(cert) => {
+                cert.nonsigner_stake_and_signature.non_signer_pubkeys.iter()
+            }
+        };
+
+        // not the same version of G1Point
+        pks.map(|pk| eigenda_cert_verifier::convert::point_to_hash(pk))
+            .collect()
+    }
+
+    pub fn non_signer_quorum_bitmap_indices(&self) -> &[u32] {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                &cert
+                    .nonsigner_stake_and_signature
+                    .non_signer_quorum_bitmap_indices
+            }
+
+            EigenDAVersionedCert::V3(cert) => {
+                &cert
+                    .nonsigner_stake_and_signature
+                    .non_signer_quorum_bitmap_indices
+            }
+        }
+    }
+
+    pub fn signed_quorum_numbers(&self) -> &Bytes {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => &cert.signed_quorum_numbers,
+            EigenDAVersionedCert::V3(cert) => &cert.signed_quorum_numbers,
+        }
+    }
+
+    pub fn quorum_apk_indices(&self) -> &[u32] {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                &cert.nonsigner_stake_and_signature.quorum_apk_indices
+            }
+            EigenDAVersionedCert::V3(cert) => {
+                &cert.nonsigner_stake_and_signature.quorum_apk_indices
+            }
+        }
+    }
+
+    pub fn non_signer_total_stake_indices(&self) -> &[u32] {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                &cert.nonsigner_stake_and_signature.total_stake_indices
+            }
+            EigenDAVersionedCert::V3(cert) => {
+                &cert.nonsigner_stake_and_signature.total_stake_indices
+            }
+        }
+    }
+
+    pub fn non_signer_stake_indices(&self) -> &[Vec<u32>] {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => {
+                &cert.nonsigner_stake_and_signature.non_signer_stake_indices
+            }
+            EigenDAVersionedCert::V3(cert) => {
+                &cert.nonsigner_stake_and_signature.non_signer_stake_indices
+            }
+        }
+    }
+
+    pub fn batch_header_v2(&self) -> &BatchHeaderV2 {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => &cert.batch_header_v2,
+            EigenDAVersionedCert::V3(cert) => &cert.batch_header_v2,
+        }
+    }
+
+    pub fn blob_inclusion_info(&self) -> &BlobInclusionInfo {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => &cert.blob_inclusion_info,
+            EigenDAVersionedCert::V3(cert) => &cert.blob_inclusion_info,
+        }
+    }
+
+    pub fn nonsigner_stake_and_signature(&self) -> &NonSignerStakesAndSignature {
+        match &self.0 {
+            EigenDAVersionedCert::V2(cert) => &cert.nonsigner_stake_and_signature,
+            EigenDAVersionedCert::V3(cert) => &cert.nonsigner_stake_and_signature,
+        }
     }
 }
 

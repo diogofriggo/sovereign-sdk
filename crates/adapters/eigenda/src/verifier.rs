@@ -397,21 +397,20 @@ impl EigenDaInclusionProof {
         self.transactions
             .iter()
             .filter_map(move |TransactionWithBlob { tx, blob }| {
-                // Extract certificate
-                let cert = extract_certificate(&tx)?;
+                let cert = &extract_certificate(tx)?;
 
                 // Verify cert recency
-                verify_cert_recency(header, &cert, cert_recency_window).ok()?;
+                verify_cert_recency(header, cert, cert_recency_window).ok()?;
 
                 // Verify cert against the ancestor
                 let current_height = header.height();
                 let referenced_height = cert.reference_block();
                 let ancestor = get_ancestor(proven_ancestors, current_height, referenced_height)?;
-                verify_cert(ancestor, &cert).ok()?;
+                verify_cert(header, ancestor, cert).ok()?;
 
                 // Verify the blob against the cert
                 let blob = blob.as_ref()?.clone();
-                verify_blob(&cert, &blob).ok()?;
+                verify_blob(cert, &blob).ok()?;
 
                 let hash = EthereumHash::from(*tx.hash());
                 let sender = tx.recover_signer().ok()?;

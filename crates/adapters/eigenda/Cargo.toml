@@ -28,6 +28,7 @@ alloy-rpc-types = { version = "1.0.23", default-features = false }
 alloy-rpc-types-eth = { version = "1.0.23", default-features = false }
 alloy-signer = { version = "1.0.23", default-features = false }
 alloy-signer-local = { version = "1.0.23", default-features = false }
+alloy-sol-types = { version = "1.0.23", default-features = false }
 alloy-transport = { version = "1.0.23", default-features = false }
 
 # Reth
@@ -43,6 +44,7 @@ borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
 bytes = { version = "1.10.1", default-features = false }
 derive_more = { version = "2.0.1" }
 futures = { version = "0.3.31" }
+hashbrown = { version = "0.15.4", default-features = false, features = ["default-hasher"] }
 hex = { version = "0.4.3" }
 reqwest = { version = "0.12.22", features = ["json"], optional = true }
 # Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L250
