@@ -1,5 +1,5 @@
 use crate::{
-    eigenda::validation::{verify_blob, verify_cert, verify_cert_recency},
+    eigenda::validation::{BlobVerificationError, verify_blob, verify_cert, verify_cert_recency},
     ethereum::{extract_certificate, get_ancestor},
     spec::{
         AncestorMetadata, BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
@@ -212,6 +212,9 @@ pub enum InclusionProofError {
     #[error("Transaction ({0}) in proof wasn't part of the completeness proof")]
     NotProvenTransaction(B256),
 
+    #[error("Ancestor missing, height({0})")]
+    AncestorMissing(u64),
+
     #[error("Proof incomplete, some relevant transactions are missing")]
     ProofIncomplete,
 
@@ -229,6 +232,12 @@ pub enum InclusionProofError {
 
     #[error("Malformed data for transaction ({0})")]
     IncorrectBlobData(EthereumHash),
+
+    #[error("Error occurred while verifying EigenDA blob: {0}")]
+    BlobVerificationError(#[from] BlobVerificationError),
+
+    #[error("Error occurred while tried to recover a transaction sender")]
+    RecoverSenderError,
 }
 
 /// A proof of inclusion of the rollup transactions from the block.
@@ -268,7 +277,7 @@ impl EigenDaInclusionProof {
         // already proven to be a complete set.
         let mut namespace_transaction_hashes = proven_transactions
             .iter()
-            .filter(|tx| namespace.contains(&tx.tx))
+            .filter(|TransactionWithBlob { tx, .. }| namespace.contains(tx))
             .map(|TransactionWithBlob { tx, .. }| tx.hash());
 
         loop {
@@ -292,6 +301,67 @@ impl EigenDaInclusionProof {
                 (None, None) => return Ok(()),
             }
         }
+    }
+
+    /// Verify that all transactions with the valid certificates have a valid
+    /// data blob. The transactions with an invalid certificates are ignored. If
+    /// there is a single transaction with the valid certificate but invalid or
+    /// missing data blob, the proof fails.
+    fn verify_certs_and_blobs(
+        &self,
+        header: &EthereumBlockHeader,
+        proven_ancestors: &[AncestorMetadata],
+        cert_recency_window: u64,
+    ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>>
+    {
+        // Returning of iterator might be a bit convoluted. But it's nice
+        // because we can skip having to allocate a temporary vector for
+        // verified senders with blobs. The idea here is. Ignore all
+        // transactions with the invalid certificates. If the certificate is
+        // valid but the data blob is not, return a proof error. If both are
+        // valid, construct a validated blob with sender.
+        self.transactions
+            .iter()
+            .flat_map(move |TransactionWithBlob { tx, blob }| {
+                // Skipping malformed cert
+                let Some(cert) = extract_certificate(tx) else {
+                    return None;
+                };
+
+                // Skipping cert with failed recency check
+                if !verify_cert_recency(header, &cert, cert_recency_window).is_ok() {
+                    return None;
+                }
+
+                let referenced_height = cert.reference_block();
+                let Some(ancestor) =
+                    get_ancestor(proven_ancestors, header.height(), referenced_height)
+                else {
+                    return Some(Err(InclusionProofError::AncestorMissing(referenced_height)));
+                };
+
+                // Skipping invalid cert
+                if !verify_cert(header, ancestor, &cert).is_ok() {
+                    return None;
+                }
+
+                // The certificate is proven to be valid. The corresponding blob
+                // should exist and it should be valid.
+                let Some(blob) = blob.as_ref() else {
+                    return Some(Err(InclusionProofError::MissingBlob(*tx.hash())));
+                };
+                if let Err(err) = verify_blob(&cert, blob) {
+                    return Some(Err(err.into()));
+                };
+
+                // The relationship is valid
+                let Ok(sender) = tx.recover_signer() else {
+                    return Some(Err(InclusionProofError::RecoverSenderError));
+                };
+                let hash = EthereumHash::from(*tx.hash());
+                let sender = EthereumAddress::from(sender);
+                Some(Ok((hash, sender, blob.clone())))
+            })
     }
 
     /// Verify that the given `blobs_with_senders` list form a complete set of
@@ -327,20 +397,28 @@ impl EigenDaInclusionProof {
     ) -> Result<(), InclusionProofError> {
         // Verify transactions contained by the proof
         self.verify_transactions(namespace, proven_transactions)?;
+        // Verify certificates and blobs
+        let mut valid_proven_blobs =
+            self.verify_certs_and_blobs(header, proven_ancestors, cert_recency_window);
 
         let mut blobs_with_senders = blobs_with_senders.iter();
-        let mut proven_blobs =
-            self.proven_relevant_blobs(header, proven_ancestors, cert_recency_window);
 
         // Compare proven transactions to the provided transactions represented
         // as blobs with senders
         loop {
             let (hash, sender, blob, provided) =
-                match (proven_blobs.next(), blobs_with_senders.next()) {
-                    (Some((hash, sender, blob)), Some(provided)) => (hash, sender, blob, provided),
+                match (valid_proven_blobs.next(), blobs_with_senders.next()) {
+                    // We have a proven blob and some provided BlobWithSender
+                    (Some(Ok((hash, sender, blob))), Some(provided)) => {
+                        (hash, sender, blob, provided)
+                    }
                     // `blob_with_sender` not provided
-                    (Some((hash, ..)), None) => {
+                    (Some(Ok((hash, ..))), None) => {
                         return Err(InclusionProofError::MissingBlob(*hash));
+                    }
+                    // The certificate/blob verification resulted in an error
+                    (Some(Err(err)), _) => {
+                        return Err(err);
                     }
                     // Missing transaction for the provided `blob_with_sender``
                     (None, Some(provided)) => {
@@ -383,39 +461,5 @@ impl EigenDaInclusionProof {
         }
 
         Ok(())
-    }
-
-    /// Return all the hashes, addresses and blobs from the transactions held by
-    /// the proof. Only the transactions with valid certificates and blobs are
-    /// returned. The invalid transactions are excluded.
-    fn proven_relevant_blobs(
-        &self,
-        header: &EthereumBlockHeader,
-        proven_ancestors: &[AncestorMetadata],
-        cert_recency_window: u64,
-    ) -> impl Iterator<Item = (EthereumHash, EthereumAddress, Bytes)> {
-        self.transactions
-            .iter()
-            .filter_map(move |TransactionWithBlob { tx, blob }| {
-                let cert = &extract_certificate(tx)?;
-
-                // Verify cert recency
-                verify_cert_recency(header, cert, cert_recency_window).ok()?;
-
-                // Verify cert against the ancestor
-                let current_height = header.height();
-                let referenced_height = cert.reference_block();
-                let ancestor = get_ancestor(proven_ancestors, current_height, referenced_height)?;
-                verify_cert(header, ancestor, cert).ok()?;
-
-                // Verify the blob against the cert
-                let blob = blob.as_ref()?.clone();
-                verify_blob(cert, &blob).ok()?;
-
-                let hash = EthereumHash::from(*tx.hash());
-                let sender = tx.recover_signer().ok()?;
-                let sender = EthereumAddress::from(sender);
-                Some((hash, sender, blob))
-            })
     }
 }

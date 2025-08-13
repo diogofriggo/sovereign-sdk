@@ -6,10 +6,8 @@ use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 
 /// Extract certificate from the transaction. Return None if no parsable
 /// certificate exists.
-pub fn extract_certificate(
-    transaction: &EthereumTxEnvelope<TxEip4844>,
-) -> Option<StandardCommitment> {
-    let eip4844_tx = transaction.as_eip1559()?;
+pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<StandardCommitment> {
+    let eip4844_tx = tx.as_eip1559()?;
     let raw_cert = eip4844_tx.input();
 
     StandardCommitment::from_rlp_bytes(&raw_cert).ok()

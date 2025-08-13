@@ -8,6 +8,9 @@ use crate::spec::{AncestorMetadata, EthereumBlockHeader};
 pub enum CertificateVerificationError {
     #[error("The recency window was missed, inclusion_height ({0}), recency height ({1})")]
     RecencyWindowMissed(u64, u64),
+
+    #[error("Ancestor data missing")]
+    AncestorDataMissing,
 }
 
 /// Certificate recency validation
@@ -36,13 +39,18 @@ pub fn verify_cert_recency(
 ///
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation
 pub fn verify_cert(
-    _header: &EthereumBlockHeader,
-    _ancestor: &AncestorMetadata,
+    header: &EthereumBlockHeader,
+    ancestor: &AncestorMetadata,
     _cert: &StandardCommitment,
 ) -> Result<(), CertificateVerificationError> {
-    let _current_block = _header.height() as u32;
-    // TODO: Verify the certificate against the ancestor
-    // let _cert_referenced_data = ancestor.extract(&cert, current_block);
+    let _current_height = header.height() as u32;
+    let _ancestor_data = ancestor
+        .data
+        .as_ref()
+        .ok_or_else(|| CertificateVerificationError::AncestorDataMissing)?;
+
+    // TODO: Verify the certificate against the ancestor data
+    // let _cert_referenced_data = ancestor_data.extract(&cert, current_height);
 
     Ok(())
 }
