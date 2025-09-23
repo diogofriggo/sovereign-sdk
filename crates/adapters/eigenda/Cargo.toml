@@ -1,0 +1,104 @@
+[package]
+edition = "2024"
+name = "sov-eigenda-adapter"
+version = "0.1.0"
+
+[dependencies]
+alloy-consensus = { version = "1.0.32", default-features = false, features = [
+  "serde",
+  "serde-bincode-compat",
+  "k256",
+] }
+alloy-eips = { version = "1.0.32", default-features = false }
+alloy-network = { version = "1.0.32", default-features = false }
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-provider = { version = "1.0.32", default-features = false }
+alloy-rpc-client = { version = "1.0.32", default-features = false }
+alloy-rpc-types = { version = "1.0.32", default-features = false }
+alloy-rpc-types-eth = { version = "1.0.32", default-features = false }
+alloy-signer = { version = "1.0.32", default-features = false }
+alloy-signer-local = { version = "1.0.32", default-features = false }
+alloy-sol-types = { workspace = true }
+alloy-transport = { version = "1.0.32", default-features = false }
+anyhow = { version = "1.0.99", default-features = false }
+arbitrary = { workspace = true, optional = true }
+async-trait = "0.1.88"
+backon = { version = "1.5.2", optional = true }
+borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
+bytes = { workspace = true }
+derive_more = { workspace = true }
+eigenda = { path = "../eigenda" }
+futures = { version = "0.3.31" }
+hashbrown = { workspace = true, features = ["default-hasher"] }
+hex = { workspace = true }
+proptest = { workspace = true, features = ["alloc", "std"], optional = true }
+reqwest = { version = "0.12.22", features = ["json"], optional = true }
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.7.0", default-features = false, features = [
+  "serde",
+] }
+rustls = { version = "0.23.31", features = ["aws-lc-rs"], optional = true }
+serde = { workspace = true, features = ["alloc", "derive"] }
+serde_json = { version = "1.0.141" }
+serde_with = { version = "3.14.0" }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+thiserror = { workspace = true }
+tokio = { version = "1.47.1", features = ["sync"], optional = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.20", features = [
+  "env-filter",
+  "local-time",
+] }
+tracing-tree = "0.4"
+url = { version = "2.5.4" }
+# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
+schemars = { version = "0.8.21", default-features = false, features = [
+  "derive",
+] }
+
+[build-dependencies]
+ark-bn254 = { workspace = true }
+ark-serialize = { workspace = true, features = ["derive"] }
+bincode = { workspace = true, features = ["derive"] }
+rust-kzg-bn254-prover = { workspace = true }
+
+[dev-dependencies]
+alloy-consensus = { version = "1.0.32", default-features = false, features = [
+  "arbitrary",
+] }
+alloy-provider = { version = "1.0.32", default-features = false, features = [
+  "anvil-api",
+] }
+alloy-rpc-types = { version = "1.0.32", default-features = false, features = [
+  "anvil",
+] }
+arbitrary = { workspace = true }
+bincode = { workspace = true, features = ["derive", "serde", "std"] }
+hex = { workspace = true }
+jsonschema = { workspace = true }
+rand = { workspace = true }
+reltester = { workspace = true }
+risc0-zkvm = { workspace = true, features = ["std"] }
+test-strategy = { workspace = true }
+testcontainers = { workspace = true }
+wiremock = { workspace = true }
+
+[features]
+arbitrary = ["dep:arbitrary", "dep:proptest"]
+default = []
+native = [
+  "sov-rollup-interface/native",
+  "alloy-rpc-types/anvil",
+  "alloy-rpc-client/default",
+  "alloy-rpc-client/ws",
+  "alloy-provider/anvil-api",
+  "alloy-provider/default",
+  "alloy-provider/ws",
+  "alloy-eips/kzg",
+  "reth-trie-common/eip1186",
+  "dep:rustls",
+  "dep:backon",
+  "dep:tokio",
+  "dep:reqwest",
+]
+stale-stakes-forbidden = []
+use-rbn-state = []
