@@ -730,6 +730,7 @@ mod use_rbn_state_tests {
 
     use alloy_primitives::{Address, B256};
     use bytes::Bytes;
+    use sov_rollup_interface::da::BlockHeaderTrait;
 
     use crate::spec::{BlobWithSender, NamespaceId};
     use crate::verifier::{EigenDaInclusionProof, InclusionProofError, tests};
@@ -862,6 +863,136 @@ mod use_rbn_state_tests {
         assert!(matches!(
             result,
             Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_get_ancestor_valid_cases() {
+        let ancestor1 = tests::create_test_header(10, B256::from_slice(&[9; 32]), B256::default());
+        let ancestor2 = tests::create_test_header(11, B256::from_slice(&[10; 32]), B256::default());
+        let ancestor3 = tests::create_test_header(12, B256::from_slice(&[11; 32]), B256::default());
+        let ancestors = vec![ancestor1, ancestor2, ancestor3];
+
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        // Test getting the most recent ancestor (index 2, height 12)
+        let result = proof.get_ancestor(13, 12);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().height(), 12);
+
+        // Test getting the middle ancestor (index 1, height 11)
+        let result = proof.get_ancestor(13, 11);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().height(), 11);
+
+        // Test getting the oldest ancestor (index 0, height 10)
+        let result = proof.get_ancestor(13, 10);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().height(), 10);
+    }
+
+    #[test]
+    fn test_get_ancestor_invalid_cases() {
+        let ancestor1 = tests::create_test_header(10, B256::from_slice(&[9; 32]), B256::default());
+        let ancestor2 = tests::create_test_header(11, B256::from_slice(&[10; 32]), B256::default());
+        let ancestors = vec![ancestor1, ancestor2];
+
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        // Test requesting a height equal to current height (should return None)
+        let result = proof.get_ancestor(12, 12);
+        assert!(result.is_none());
+
+        // Test requesting a height greater than current height (should return None)
+        let result = proof.get_ancestor(12, 15);
+        assert!(result.is_none());
+
+        // Test requesting a height too far back (should return None)
+        let result = proof.get_ancestor(12, 8);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_ancestor_empty_ancestors() {
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        // Should return None for any request when no ancestors are present
+        let result = proof.get_ancestor(12, 10);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_verify_ancestors_valid_chain() {
+        // Create a valid ancestry chain: 10 -> 11 -> 12 -> 13
+        let ancestor1 = tests::create_test_header(10, B256::from_slice(&[9; 32]), B256::default());
+        let ancestor2 = tests::create_test_header(11, *ancestor1.hash(), B256::default());
+        let ancestor3 = tests::create_test_header(12, *ancestor2.hash(), B256::default());
+        let current_header = tests::create_test_header(13, *ancestor3.hash(), B256::default());
+
+        let ancestors = vec![ancestor1, ancestor2, ancestor3];
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        let result = proof.verify_ancestors(&current_header);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_ancestors_empty_chain() {
+        let current_header =
+            tests::create_test_header(13, B256::from_slice(&[12; 32]), B256::default());
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        // Empty ancestry chain should be valid
+        let result = proof.verify_ancestors(&current_header);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_ancestors_single_valid_ancestor() {
+        let ancestor = tests::create_test_header(12, B256::from_slice(&[11; 32]), B256::default());
+        let current_header = tests::create_test_header(13, *ancestor.hash(), B256::default());
+
+        let ancestors = vec![ancestor];
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        let result = proof.verify_ancestors(&current_header);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_ancestors_incorrect_chain() {
+        // Create an invalid ancestry chain where parent hashes don't match
+        let ancestor1 = tests::create_test_header(10, B256::from_slice(&[9; 32]), B256::default());
+        let ancestor2 = tests::create_test_header(11, B256::from_slice(&[99; 32]), B256::default()); // Wrong parent hash
+        let ancestor3 = tests::create_test_header(12, *ancestor2.hash(), B256::default());
+        let current_header = tests::create_test_header(13, *ancestor3.hash(), B256::default());
+
+        let ancestors = vec![ancestor1, ancestor2, ancestor3];
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        let result = proof.verify_ancestors(&current_header);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IncorrectAncestry)
+        ));
+    }
+
+    #[test]
+    fn test_verify_ancestors_incorrect_current_parent() {
+        // Create ancestors that are valid among themselves but don't connect to current header
+        let ancestor1 = tests::create_test_header(10, B256::from_slice(&[9; 32]), B256::default());
+        let ancestor2 = tests::create_test_header(11, *ancestor1.hash(), B256::default());
+        let ancestor3 = tests::create_test_header(12, *ancestor2.hash(), B256::default());
+        let current_header =
+            tests::create_test_header(13, B256::from_slice(&[99; 32]), B256::default()); // Wrong parent
+
+        let ancestors = vec![ancestor1, ancestor2, ancestor3];
+        let proof = EigenDaInclusionProof::new(ancestors, vec![]);
+
+        let result = proof.verify_ancestors(&current_header);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IncorrectAncestry)
         ));
     }
 }
