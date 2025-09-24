@@ -442,12 +442,7 @@ impl EigenDaInclusionProof {
                     return Some(Err(err));
                 };
 
-                #[cfg(feature = "use-rbn-state")]
-                let current_block = referenced_height;
-                #[cfg(not(feature = "use-rbn-state"))]
-                let current_block = header.height();
-
-                let inputs = state.extract(&cert, current_block as u32).ok()?;
+                let inputs = state.extract(&cert, header.height() as u32).ok()?;
 
                 // Verify the cert. We are skipping it if it's invalid.
                 cert::verify(inputs).ok()?;

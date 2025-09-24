@@ -270,7 +270,7 @@ impl EigenDaService {
             };
 
             // Verify the certificate against the state
-            let inputs = cert_state.extract(&cert, cert_state_header.height() as u32)?;
+            let inputs = cert_state.extract(&cert, header.height() as u32)?;
 
             if let Err(err) = cert::verify(inputs) {
                 debug!(
