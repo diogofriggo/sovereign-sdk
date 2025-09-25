@@ -1,0 +1,68 @@
+[da]
+# Network
+network = "Sepolia"
+# URL of the Ethereum RPC node.
+ethereum_rpc_url = "wss://ethereum-sepolia-rpc.publicnode.com"
+# URL of the EigenDA proxy node.
+proxy_url = "http://127.0.0.1:3100"
+# Private key of the sequencer. The account with corresponding private key is
+# used by the sequencer to persist the certificates to Ethereum. Expected
+# private key in the HEX format.
+sequencer_signer = "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83"
+
+[storage]
+# The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
+path = "demo_data"
+state_cache_size = 4294967296 # 4GB. Default is 1GB.
+
+# We define the rollup's genesis to occur at block number `genesis_height`. The rollup will ignore
+# any blocks before this height, and any blobs at this height will not be processed
+[runner]
+da_polling_interval_ms = 15000
+genesis_height = 9276500
+
+[runner.http_config]
+bind_host = "127.0.0.1"
+bind_port = 12346
+# In case the rollup is running behind a proxy
+# public_address = "http://rollup.sovereign.xyz"
+
+[monitoring]
+telegraf_address = "udp://127.0.0.1:8094"
+# Defines how many measurements a rollup node will accumulate before sending it to the Telegraf.
+# It is expected from the rollup node to produce metrics all the time,
+# so measurements are buffered by size and not sent by time.
+# and below 67 KB, which is the maximal UDP packet size.
+# It also means that if a single serialized metric is larger than this value, a UDP packet will be larger.
+# The default value is 508.
+# max_datagram_size = 508
+# How many metrics are allowed to be in pending state, before new metrics will be dropped.
+# This is a number of metrics, not serialized bytes.
+# The total number of bytes to be held in memory might vary per metric + `max_datagram_size`
+# max_pending_metrics = 100
+
+[proof_manager]
+aggregated_proof_block_jump = 10
+max_number_of_transitions_in_db = 300
+max_number_of_transitions_in_memory = 100
+prover_address = "sov1lzkjgdaz08su3yevqu6ceywufl35se9f33kztu5cu2spja5hyyf"
+
+[sequencer]
+# This number should be <= than the total number of attempts by exponential builder of adapter
+blob_processing_timeout_secs = 1800 # 30 min
+max_allowed_node_distance_behind = 95
+max_batch_size_bytes = 1048576
+max_concurrent_blobs = 128
+rollup_address = "sov1lzkjgdaz08su3yevqu6ceywufl35se9f33kztu5cu2spja5hyyf"
+[sequencer.preferred]
+# TODO: Remove it when https://github.com/Sovereign-Labs/sovereign-sdk-wip/issues/2814 is resolved
+disable_state_root_consistency_checks = true
+# Strategy for handling recovery scenarios when the sequencer is too far behind.
+# "None" - Shutdown the sequencer instead of attempting recovery (default)
+# "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
+recovery_strategy = "TryToSave"
+batch_execution_time_limit_millis = 12000 # Do no more than 12 seconds worth of work per batch, even if the DA layer isn't producing blocks regularly
+
+[sequencer.extension]
+max_log_limit = 20000
+ideal_lag_behind_finalized_slot = 10

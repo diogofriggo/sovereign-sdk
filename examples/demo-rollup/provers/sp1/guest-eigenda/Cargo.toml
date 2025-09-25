@@ -1,0 +1,57 @@
+[package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+name = "sov-demo-prover-guest-eigenda-sp1"
+resolver = "2"
+version = "0.3.0"
+
+[workspace]
+
+[dependencies]
+const-rollup-config = { path = "../../../../const-rollup-config" }
+demo-stf = { path = "../../../stf" }
+
+sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-eigenda-adapter = { path = "../../../../../crates/sov-eigenda-adapter/." }
+sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-sp1-adapter = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-state = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sp1-zkvm = { version = "5.0.8" }
+
+[patch.crates-io]
+# Commented out branches, but below there are exact revision, this helps with preventing accidental breakages
+#sha2-v0-9-9 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-v0.9.9" }
+sha2-v0-9-9 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", rev = "32cd33136ff22cc977ea6a95dd5a322a1de7283c" }
+#sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", branch = "patch-v0.10.8" }
+sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", rev = "1f224388fdede7cef649bce0d63876d1a9e3f515" }
+#curve25519-dalek = { git = "https://github.com/sp1-patches/curve25519-dalek", branch = "patch-curve25519-v4.1.3" }
+curve25519-dalek = { git = "https://github.com/sp1-patches/curve25519-dalek", rev = "1d73fd95f1a76bee8f46643cf78bbccc1fb06ede" }
+# This is not needed, as it is patched via curve25519-dalek already
+#curve25519-dalek-ng = { git = "https://github.com/sp1-patches/curve25519-dalek-ng.git", branch = "patch-v4.1.1" }
+#ed25519-consensus = { git = "https://github.com/sp1-patches/ed25519-consensus", branch = "patch-v2.1.0" }
+ed25519-consensus = { git = "https://github.com/sp1-patches/ed25519-consensus", rev = "2b2c4b43344bc4daf5b1326f367f2d9d661eeabb" }
+#tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "patch-v2.0.2" }
+tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", rev = "bf0b28f63510a90c7b6c21ac6ff461c93ecd2331" }
+
+[profile.dev]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.release]
+debug = 1
+lto = true
+
+[profile.release.build-override]
+opt-level = 3
+
+[features]
+bench = [
+  "sov-modules-api/bench",
+  "sov-state/bench",
+  "sov-modules-stf-blueprint/bench",
+]
