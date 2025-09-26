@@ -100,5 +100,5 @@ native = [
   "dep:tokio",
   "dep:reqwest",
 ]
-stale-stakes-forbidden = []
+stale-stakes-forbidden = ["eigenda/stale-stakes-forbidden"]
 use-rbn-state = []
