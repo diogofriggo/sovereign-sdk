@@ -43,15 +43,15 @@ Now run the demo-rollup full node, as shown below. You will see it consuming blo
 
 Run the node with proving skipped:
 ```sh
-SKIP_GUEST_BUILD=true SOV_PROVER_MODE=skip cargo r -r -- --da-layer=eigen --rollup-config-path=eigenda_rollup_config.toml --genesis-config-dir=../test-data/genesis/demo/eigenda
+SKIP_GUEST_BUILD=true SOV_PROVER_MODE=skip cargo run --release
 ```
 
 Run the rollup verifier in a zkVM executor.
 ```sh
-SOV_PROVER_MODE=execute cargo r -r -- --da-layer=eigen --rollup-config-path=eigenda_rollup_config.toml --genesis-config-dir=../test-data/genesis/demo/eigenda
+SOV_PROVER_MODE=execute cargo run --release
 ```
 
 Run the rollup verifier and create a SNARK of execution.
 ```sh
-SOV_PROVER_MODE=prove cargo r -r -- --da-layer=eigen --rollup-config-path=eigenda_rollup_config.toml --genesis-config-dir=../test-data/genesis/demo/eigenda
+SOV_PROVER_MODE=prove cargo run --release
 ```

@@ -37,7 +37,16 @@ use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 
 /// A specification for the types used by a DA layer.
 #[derive(
-    Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize, BorshSerialize,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    BorshDeserialize,
+    BorshSerialize,
+    schemars::JsonSchema,
 )]
 pub struct EigenDaSpec;
 

@@ -19,16 +19,16 @@ use sov_modules_rollup_blueprint::proof_sender::SovApiProofSender;
 use sov_modules_rollup_blueprint::{
     FullNodeBlueprint, RollupBlueprint, SequencerCreationReceipt, WalletBlueprint,
 };
-use sov_risc0_adapter::Risc0;
 use sov_risc0_adapter::host::Risc0Host;
+use sov_risc0_adapter::Risc0;
 use sov_rollup_interface::da::DaVerifier;
 use sov_rollup_interface::execution_mode::WitnessGeneration;
 use sov_rollup_interface::zk::aggregated_proof::CodeCommitment;
 use sov_sequencer::{ProofBlobSender, Sequencer};
-use sov_stf_runner::RollupConfig;
 use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
+use sov_stf_runner::RollupConfig;
 
-use crate::{CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE, eth_dev_signer};
+use crate::{eth_dev_signer, CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE};
 
 /// Rollup with EigenDa
 #[derive(Default)]

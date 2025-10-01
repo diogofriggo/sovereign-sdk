@@ -23,15 +23,15 @@ use sov_risc0_adapter::host::Risc0Host;
 use sov_risc0_adapter::{Risc0, Risc0CryptoSpec};
 use sov_rollup_interface::da::{DaSpec, DaVerifier};
 use sov_rollup_interface::execution_mode::WitnessGeneration;
-use sov_rollup_interface::zk::CryptoSpec;
 use sov_rollup_interface::zk::aggregated_proof::CodeCommitment;
+use sov_rollup_interface::zk::CryptoSpec;
 use sov_sequencer::{ProofBlobSender, Sequencer};
-use sov_state::DefaultStorageSpec;
 use sov_state::nomt::prover_storage::NomtProverStorage;
-use sov_stf_runner::RollupConfig;
+use sov_state::DefaultStorageSpec;
 use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
+use sov_stf_runner::RollupConfig;
 
-use crate::{CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE, eth_dev_signer};
+use crate::{eth_dev_signer, CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE};
 
 /// Rollup with EigenDa
 #[derive(Default)]
