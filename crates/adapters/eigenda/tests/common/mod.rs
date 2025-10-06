@@ -3,7 +3,10 @@ pub mod tracing;
 
 use std::str::FromStr;
 
-use sov_eigenda_adapter::service::config::{EigenDaConfig, Network};
+use eigenda_ethereum::provider::EigenDaProviderConfig;
+use eigenda_ethereum::provider::Network;
+use eigenda_proxy::EigenDaProxyConfig;
+use sov_eigenda_adapter::service::config::EigenDaConfig;
 use sov_eigenda_adapter::service::{EigenDaService, EigenDaServiceError};
 use sov_eigenda_adapter::spec::{NamespaceId, RollupParams};
 use sov_eigenda_adapter::verifier::EigenDaVerifier;
@@ -16,19 +19,23 @@ pub static ROLLUP_PROOF_NAMESPACE: &str = "0xbb7F59238c5FEe337c003dfae48f5d04C13
 pub static CERT_RECENCY_WINDOW: u64 = 3200;
 
 pub async fn setup_adapter(
-    proxy_url: String,
+    url: String,
 ) -> Result<(EigenDaService, EigenDaVerifier), EigenDaServiceError> {
     let config = EigenDaConfig {
-        network: Network::Sepolia,
-        ethereum_rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com".to_string(),
-        sequencer_signer: SEQUENCER_SIGNER.to_string(),
-        ethereum_compute_units: None,
-        ethereum_max_retry_times: None,
-        ethereum_initial_backoff: None,
-        proxy_url,
-        proxy_min_retry_delay: None,
-        proxy_max_retry_delay: None,
-        proxy_max_retry_times: None,
+        signer: SEQUENCER_SIGNER.to_string(),
+        provider: EigenDaProviderConfig {
+            network: Network::Sepolia,
+            rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com".to_string(),
+            compute_units: None,
+            max_retry_times: None,
+            initial_backoff: None,
+        },
+        proxy: EigenDaProxyConfig {
+            url,
+            min_retry_delay: None,
+            max_retry_delay: None,
+            max_retry_times: None,
+        },
     };
     let params = RollupParams {
         rollup_batch_namespace: NamespaceId::from_str(ROLLUP_BATCH_NAMESPACE).unwrap(),

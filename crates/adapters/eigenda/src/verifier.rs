@@ -3,9 +3,10 @@ use alloy_consensus::transaction::SignerRecoverable;
 use alloy_consensus::{EthereumTxEnvelope, TxEip4844};
 use alloy_primitives::B256;
 use bytes::Bytes;
-use eigenda::verification::blob::codec::decode_encoded_payload;
-use eigenda::verification::blob::error::BlobVerificationError;
-use eigenda::verification::cert;
+use eigenda_ethereum::extraction::{CertStateData, extract_certificate};
+use eigenda_verification::verification::blob::codec::decode_encoded_payload;
+use eigenda_verification::verification::blob::error::BlobVerificationError;
+use eigenda_verification::verification::{cert, verify_blob, verify_cert_recency};
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -15,11 +16,9 @@ use sov_rollup_interface::da::{
 use thiserror::Error;
 use tracing::instrument;
 
-use crate::eigenda::verification::{verify_blob, verify_cert_recency};
-use crate::ethereum::extract_certificate;
 use crate::spec::{
-    BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
-    EthereumHash, NamespaceId, TransactionWithBlob,
+    BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash, NamespaceId,
+    TransactionWithBlob,
 };
 
 /// Errors that may occur when verifying with the [`EigenDaVerifier`].
@@ -323,7 +322,7 @@ impl EigenDaInclusionProof {
         &self,
         header: &EthereumBlockHeader,
         #[cfg(feature = "use-rbn-state")] referenced_height: u64,
-        state: &CertificateStateData,
+        state: &CertStateData,
     ) -> Result<(), InclusionProofError> {
         // Verify the certificate state against the referenced block header state root
         #[cfg(feature = "use-rbn-state")]
@@ -425,7 +424,8 @@ impl EigenDaInclusionProof {
 
                 // Check the recency. Skipping certs with failed recency check
                 let referenced_height = cert.reference_block();
-                verify_cert_recency(header, referenced_height, cert_recency_window).ok()?;
+                verify_cert_recency(header.height(), referenced_height, cert_recency_window)
+                    .ok()?;
 
                 // State should be set, so we can verify the cert
                 let Some(state) = cert_state.as_ref() else {

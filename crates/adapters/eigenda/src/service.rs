@@ -1,4 +1,5 @@
-/// Configuration types for EigenDA service.
+/// Configuration types and utilities for EigenDA Ethereum integration.
+#[cfg(feature = "native")]
 pub mod config;
 
 use std::ops::Not;
@@ -10,18 +11,18 @@ use alloy_consensus::transaction::SignerRecoverable;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
 use alloy_primitives::TxHash;
-use alloy_provider::{DynProvider, Provider};
-use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{Transaction, TransactionRequest};
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
-use eigenda::cert::StandardCommitment;
-use eigenda::verification::blob::codec::decode_encoded_payload;
-use eigenda::verification::cert;
-use futures::future::try_join_all;
-use reth_trie_common::AccountProof;
+use eigenda_ethereum::extraction::{CertExtractionError, extract_certificate};
+use eigenda_ethereum::provider::EigenDaProvider;
+use eigenda_proxy::{ProxyClient, ProxyError};
+use eigenda_verification::cert::StandardCommitment;
+use eigenda_verification::verification::blob::codec::decode_encoded_payload;
+use eigenda_verification::verification::{cert, verify_cert_recency};
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::common::HexHash;
 use sov_rollup_interface::da::{
@@ -33,15 +34,10 @@ use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::eigenda::extraction::{CertExtractionError, contract};
-use crate::eigenda::proxy::{ProxyClient, ProxyError};
-use crate::eigenda::verification::verify_cert_recency;
-use crate::ethereum::extract_certificate;
-use crate::ethereum::provider::init_ethereum_provider;
-use crate::service::config::{EigenDaConfig, EigenDaContracts, Network};
+use crate::service::config::EigenDaConfig;
 use crate::spec::{
-    BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
-    EthereumHash, NamespaceId, RollupParams, TransactionWithBlob,
+    BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash, NamespaceId,
+    RollupParams, TransactionWithBlob,
 };
 use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier};
 
@@ -76,19 +72,22 @@ pub enum EigenDaServiceError {
 pub struct EigenDaService {
     /// Client for interacting with the EigenDA proxy node
     proxy: ProxyClient,
+
     /// Provider for interacting with an Ethereum node
-    ethereum: DynProvider,
+    provider: EigenDaProvider,
+
     /// The account to which we are storing the certificates of the batch blobs
     rollup_batch_namespace: NamespaceId,
+
     /// The account to which we are storing the certificates of the proof blobs
     rollup_proof_namespace: NamespaceId,
+
     /// Cert recency window
     cert_recency_window: u64,
+
     /// Private key of the sequencer. It is used to sign the transactions
     /// persisting the certificates to Ethereum
     sequencer_signer: PrivateKeySigner,
-    /// EigenDA relevant contracts
-    contracts: EigenDaContracts,
 }
 
 impl EigenDaService {
@@ -104,34 +103,27 @@ impl EigenDaService {
         }
 
         // Setup Ethereum client
-        let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)
+        let sequencer_signer = LocalSigner::from_str(&config.signer)
             .map_err(|err| EigenDaServiceError::Configuration(err.to_string()))?;
-        let ethereum = init_ethereum_provider(&config, sequencer_signer.clone()).await?;
+
+        let provider = EigenDaProvider::new(&config.provider, sequencer_signer.clone()).await?;
 
         // Setup proxy client
-        let proxy = ProxyClient::new(&config)?;
-
-        // Set contracts used
-        let contracts = match config.network {
-            Network::Mainnet => EigenDaContracts::mainnet(&ethereum).await,
-            Network::Holesky => EigenDaContracts::holesky(&ethereum).await,
-            Network::Sepolia => EigenDaContracts::sepolia(&ethereum).await,
-        }?;
+        let proxy = ProxyClient::new(&config.proxy)?;
 
         info!(?config, ?params, "EigenDa service initialized");
 
         Ok(Self {
             proxy,
-            ethereum,
+            provider,
             rollup_batch_namespace: params.rollup_batch_namespace,
             rollup_proof_namespace: params.rollup_proof_namespace,
             cert_recency_window: params.cert_recency_window,
             sequencer_signer,
-            contracts,
         })
     }
 
-    /// Submit a blob to the EigenDA.
+    /// Submit a blob to EigenDA.
     #[instrument(skip_all)]
     async fn submit_blob_to_namespace(
         &self,
@@ -174,7 +166,7 @@ impl EigenDaService {
                 .with_to(namespace.into())
                 .with_input(cert.clone());
 
-            self.ethereum.send_transaction(tx).await
+            self.provider.send_transaction(tx).await
         };
 
         // Notification on each retry
@@ -231,9 +223,11 @@ impl EigenDaService {
             };
 
             // Verify certificate recency
-            if let Err(err) =
-                verify_cert_recency(header, cert.reference_block(), self.cert_recency_window)
-            {
+            if let Err(err) = verify_cert_recency(
+                header.height(),
+                cert.reference_block(),
+                self.cert_recency_window,
+            ) {
                 debug!(
                     ?header,
                     ?cert,
@@ -265,7 +259,7 @@ impl EigenDaService {
             #[cfg(not(feature = "use-rbn-state"))]
             let (cert_state_header, cert_state) = {
                 let state_height = header.height();
-                let state = self.fetch_cert_state(state_height, &cert).await?;
+                let state = self.provider.fetch_cert_state(state_height, &cert).await?;
                 (header.clone(), state)
             };
 
@@ -308,115 +302,6 @@ impl EigenDaService {
 
         Ok(block_transactions)
     }
-
-    /// Fetches the relevant state used to validate the EigenDA certificate.
-    async fn fetch_cert_state(
-        &self,
-        block_height: u64,
-        cert: &StandardCommitment,
-    ) -> Result<CertificateStateData, EigenDaServiceError> {
-        let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
-        let threshold_registry_fut = self
-            .ethereum
-            .get_proof(self.contracts.threshold_registry, keys)
-            .number(block_height)
-            .into_future();
-
-        let keys = contract::RegistryCoordinator::storage_keys(cert);
-        let registry_coordinator_fut = self
-            .ethereum
-            .get_proof(self.contracts.registry_coordinator, keys)
-            .number(block_height)
-            .into_future();
-
-        #[cfg(feature = "stale-stakes-forbidden")]
-        let service_manager_fut = {
-            let keys = contract::ServiceManager::storage_keys(cert);
-            self.ethereum
-                .get_proof(self.contracts.service_manager, keys)
-                .number(block_height)
-                .into_future()
-        };
-
-        let keys = contract::BlsApkRegistry::storage_keys(cert);
-        let bls_apk_registry_fut = self
-            .ethereum
-            .get_proof(self.contracts.bls_apk_registry, keys)
-            .number(block_height)
-            .into_future();
-
-        let keys = contract::StakeRegistry::storage_keys(cert);
-        let stake_registry_fut = self
-            .ethereum
-            .get_proof(self.contracts.stake_registry, keys)
-            .number(block_height)
-            .into_future();
-
-        let keys = contract::EigenDaCertVerifier::storage_keys(cert);
-        let cert_verifier_fut = self
-            .ethereum
-            .get_proof(self.contracts.cert_verifier, keys)
-            .number(block_height)
-            .into_future();
-
-        #[cfg(feature = "stale-stakes-forbidden")]
-        let delegation_manager_fut = {
-            let keys = contract::DelegationManager::storage_keys(cert);
-            self.ethereum
-                .get_proof(self.contracts.delegation_manager, keys)
-                .number(block_height)
-                .into_future()
-        };
-
-        let responses = try_join_all([
-            threshold_registry_fut,
-            registry_coordinator_fut,
-            #[cfg(feature = "stale-stakes-forbidden")]
-            service_manager_fut,
-            bls_apk_registry_fut,
-            stake_registry_fut,
-            cert_verifier_fut,
-            #[cfg(feature = "stale-stakes-forbidden")]
-            delegation_manager_fut,
-        ])
-        .await?;
-
-        #[cfg(feature = "stale-stakes-forbidden")]
-        let [
-            threshold_registry,
-            registry_coordinator,
-            service_manager,
-            bls_apk_registry,
-            stake_registry,
-            cert_verifier,
-            delegation_manager,
-        ]: [EIP1186AccountProofResponse; 7] = responses
-            .try_into()
-            .expect("Expected correct number of elements");
-
-        #[cfg(not(feature = "stale-stakes-forbidden"))]
-        let [
-            threshold_registry,
-            registry_coordinator,
-            bls_apk_registry,
-            stake_registry,
-            cert_verifier,
-        ]: [EIP1186AccountProofResponse; 5] = responses
-            .try_into()
-            .expect("Expected correct number of elements");
-
-        Ok(CertificateStateData {
-            threshold_registry: AccountProof::from(threshold_registry),
-            registry_coordinator: AccountProof::from(registry_coordinator),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            service_manager: AccountProof::from(service_manager),
-            bls_apk_registry: AccountProof::from(bls_apk_registry),
-            stake_registry: AccountProof::from(stake_registry),
-            cert_verifier: AccountProof::from(cert_verifier),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            delegation_manager: AccountProof::from(delegation_manager),
-        })
-    }
 }
 
 #[async_trait]
@@ -448,7 +333,7 @@ impl DaService for EigenDaService {
         // Poll until the requested block is mined
         let poll_interval = Duration::from_secs(10);
         let block = loop {
-            match self.ethereum.get_block_by_number(number).full().await {
+            match self.provider.get_block_by_number(number).await {
                 Ok(Some(block)) => break block,
                 Ok(None) => {
                     sleep(poll_interval).await;
@@ -497,10 +382,10 @@ impl DaService for EigenDaService {
     async fn get_last_finalized_block_header(
         &self,
     ) -> Result<<Self::Spec as DaSpec>::BlockHeader, Self::Error> {
-        let block = BlockId::finalized();
+        let block_id = BlockId::finalized();
         let block = self
-            .ethereum
-            .get_block(block)
+            .provider
+            .get_block(block_id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
 
@@ -513,10 +398,10 @@ impl DaService for EigenDaService {
     async fn get_head_block_header(
         &self,
     ) -> Result<<Self::Spec as DaSpec>::BlockHeader, Self::Error> {
-        let block = BlockId::latest();
+        let block_id = BlockId::latest();
         let block = self
-            .ethereum
-            .get_block(block)
+            .provider
+            .get_block(block_id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
 
@@ -609,28 +494,30 @@ impl DaService for EigenDaService {
 mod rbn {
     use std::future::ready;
 
-    use alloy_provider::Provider;
-    use eigenda::cert::StandardCommitment;
+    use eigenda_ethereum::extraction::CertStateData;
+    use eigenda_verification::cert::StandardCommitment;
     use futures::future::Either;
     use futures::{StreamExt, TryStreamExt, stream, try_join};
     use sov_rollup_interface::da::BlockHeaderTrait;
     use tracing::warn;
 
     use crate::service::{EigenDaService, EigenDaServiceError};
-    use crate::spec::{CertificateStateData, EthereumBlockHeader};
+    use crate::spec::EthereumBlockHeader;
 
     impl EigenDaService {
         /// Fetch [`EthereumBlockHeader`] with state data needed to verify the certificate.
         pub(crate) async fn fetch_referenced_ancestor(
             &self,
             certificate: &StandardCommitment,
-        ) -> Result<(EthereumBlockHeader, CertificateStateData), EigenDaServiceError> {
+        ) -> Result<(EthereumBlockHeader, CertStateData), EigenDaServiceError> {
             let block_height = certificate.reference_block();
 
-            let (ancestor, state) = try_join!(
-                self.fetch_ancestor(block_height),
-                self.fetch_cert_state(block_height, certificate)
-            )?;
+            let (ancestor, state) = try_join!(self.fetch_ancestor(block_height), async {
+                self.provider
+                    .fetch_cert_state(block_height, certificate)
+                    .await
+                    .map_err(Into::into)
+            })?;
 
             Ok((ancestor, state))
         }
@@ -640,13 +527,12 @@ mod rbn {
             &self,
             block_height: u64,
         ) -> Result<EthereumBlockHeader, EigenDaServiceError> {
-            let block = self
-                .ethereum
-                .get_block_by_number(block_height.into())
+            let header = self
+                .provider
+                .fetch_ancestor(block_height)
                 .await?
                 .ok_or_else(|| EigenDaServiceError::AncestorMissing(block_height))?;
 
-            let header = block.header.into_consensus();
             Ok(EthereumBlockHeader::from(header))
         }
 

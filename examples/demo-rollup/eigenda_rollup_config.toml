@@ -1,14 +1,19 @@
 [da]
-# Network
-network = "Sepolia"
-# URL of the Ethereum RPC node.
-ethereum_rpc_url = "wss://ethereum-sepolia-rpc.publicnode.com"
-# URL of the EigenDA proxy node.
-proxy_url = "http://127.0.0.1:3100"
+
 # Private key of the sequencer. The account with corresponding private key is
 # used by the sequencer to persist the certificates to Ethereum. Expected
 # private key in the HEX format.
-sequencer_signer = "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83"
+signer = "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83"
+
+[da.proxy]
+# URL of the EigenDA proxy node.
+url = "http://127.0.0.1:3100"
+
+[da.provider]
+# Network
+network = "Sepolia"
+# URL of the Ethereum RPC node.
+rpc_url = "wss://ethereum-sepolia-rpc.publicnode.com"
 
 [storage]
 # The path to the rollup's data directory. Paths that do not begin with `/` are interpreted as relative paths.
@@ -19,7 +24,7 @@ state_cache_size = 4294967296 # 4GB. Default is 1GB.
 # any blocks before this height, and any blobs at this height will not be processed
 [runner]
 da_polling_interval_ms = 15000
-genesis_height = 9313900
+genesis_height = 9355125
 
 [runner.http_config]
 bind_host = "127.0.0.1"
@@ -49,7 +54,7 @@ prover_address = "sov1lzkjgdaz08su3yevqu6ceywufl35se9f33kztu5cu2spja5hyyf"
 
 [sequencer]
 # This number should be <= than the total number of attempts by exponential builder of adapter
-blob_processing_timeout_secs = 1800 # 30 min
+blob_processing_timeout_secs = 1800                                        # 30 min
 max_allowed_node_distance_behind = 95
 max_batch_size_bytes = 1048576
 max_concurrent_blobs = 128
@@ -60,9 +65,9 @@ disable_state_root_consistency_checks = true
 # Strategy for handling recovery scenarios when the sequencer is too far behind.
 # "None" - Shutdown the sequencer instead of attempting recovery (default)
 # "TryToSave" - Attempt to recover by flushing batches and catching up with the chain
-recovery_strategy = "TryToSave"
 batch_execution_time_limit_millis = 12000 # Do no more than 12 seconds worth of work per batch, even if the DA layer isn't producing blocks regularly
+recovery_strategy = "TryToSave"
 
 [sequencer.extension]
-max_log_limit = 20000
 ideal_lag_behind_finalized_slot = 10
+max_log_limit = 20000

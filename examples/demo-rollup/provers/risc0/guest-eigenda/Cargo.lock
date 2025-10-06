@@ -187,9 +187,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-hardforks"
-version = "0.3.1"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c8616642b176f21e98e2740e27d28917b5d30d8612450cafff21772d4926bc"
+checksum = "889eb3949b58368a09d4f16931c660275ef5fb08e5fbd4a96573b19c7085c41f"
 dependencies = [
  "alloy-chains",
  "alloy-eip2124",
@@ -367,17 +367,6 @@ dependencies = [
  "tower",
  "tracing",
  "wasmtimer",
-]
-
-[[package]]
-name = "alloy-rpc-types"
-version = "1.0.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2683049c5f3037d64722902e2c1081f3d45de68696aca0511bbea834905746"
-dependencies = [
- "alloy-primitives",
- "alloy-serde",
- "serde",
 ]
 
 [[package]]
@@ -1085,25 +1074,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "bincode"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
-dependencies = [
- "bincode_derive",
- "unty",
-]
-
-[[package]]
-name = "bincode_derive"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
-dependencies = [
- "virtue",
 ]
 
 [[package]]
@@ -1871,7 +1841,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "eigenda"
+name = "eigenda-ethereum"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-client",
+ "alloy-rpc-types-eth",
+ "alloy-signer-local",
+ "alloy-sol-types",
+ "alloy-transport",
+ "eigenda-verification",
+ "futures",
+ "hashbrown 0.15.5",
+ "hex",
+ "reth-trie-common",
+ "schemars 0.8.22",
+ "serde",
+ "thiserror 2.0.16",
+ "tracing",
+]
+
+[[package]]
+name = "eigenda-srs-data"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "rust-kzg-bn254-prover",
+]
+
+[[package]]
+name = "eigenda-verification"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -1880,11 +1881,10 @@ dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "bincode 2.0.1",
  "bitvec",
  "bytes",
  "derive_more 2.0.1",
+ "eigenda-srs-data",
  "hashbrown 0.15.5",
  "hex",
  "rust-kzg-bn254-primitives",
@@ -1974,7 +1974,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3718,9 +3718,9 @@ dependencies = [
 
 [[package]]
 name = "revm"
-version = "29.0.0"
+version = "29.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c278b6ee9bba9e25043e3fae648fdce632d1944d3ba16f5203069b43bddd57f"
+checksum = "718d90dce5f07e115d0e66450b1b8aa29694c1cf3f89ebddaddccc2ccbd2f13e"
 dependencies = [
  "revm-bytecode",
  "revm-context",
@@ -3749,9 +3749,9 @@ dependencies = [
 
 [[package]]
 name = "revm-context"
-version = "9.0.2"
+version = "9.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fb02c5dab3b535aa5b18277b1d21c5117a25d42af717e6ce133df0ea56663e1"
+checksum = "5a20c98e7008591a6f012550c2a00aa36cba8c14cc88eb88dec32eb9102554b4"
 dependencies = [
  "bitvec",
  "cfg-if",
@@ -3766,9 +3766,9 @@ dependencies = [
 
 [[package]]
 name = "revm-context-interface"
-version = "10.1.0"
+version = "10.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b8e9311d27cf75fbf819e7ba4ca05abee1ae02e44ff6a17301c7ab41091b259"
+checksum = "b50d241ed1ce647b94caf174fcd0239b7651318b2c4c06b825b59b973dfb8495"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702",
@@ -3809,9 +3809,9 @@ dependencies = [
 
 [[package]]
 name = "revm-handler"
-version = "10.0.0"
+version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528d2d81cc918d311b8231c35330fac5fba8b69766ddc538833e2b5593ee016e"
+checksum = "550331ea85c1d257686e672081576172fe3d5a10526248b663bbf54f1bef226a"
 dependencies = [
  "auto_impl",
  "derive-where",
@@ -3828,9 +3828,9 @@ dependencies = [
 
 [[package]]
 name = "revm-inspector"
-version = "10.0.0"
+version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf443b664075999a14916b50c5ae9e35a7d71186873b8f8302943d50a672e5e0"
+checksum = "7c0a6e9ccc2ae006f5bed8bd80cd6f8d3832cd55c5e861b9402fdd556098512f"
 dependencies = [
  "auto_impl",
  "either",
@@ -3846,9 +3846,9 @@ dependencies = [
 
 [[package]]
 name = "revm-interpreter"
-version = "25.0.2"
+version = "25.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d6406b711fac73b4f13120f359ed8e65964380dd6182bd12c4c09ad0d4641f"
+checksum = "06575dc51b1d8f5091daa12a435733a90b4a132dca7ccee0666c7db3851bc30c"
 dependencies = [
  "revm-bytecode",
  "revm-context-interface",
@@ -4173,8 +4173,7 @@ checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 [[package]]
 name = "rust-kzg-bn254-primitives"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a986f25bc8871261f26f4ec74ef9215d0920ec140f2ef2dfd441b33fd121738b"
+source = "git+https://github.com/Layr-Labs/rust-kzg-bn254.git?rev=60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6#60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -4192,8 +4191,7 @@ dependencies = [
 [[package]]
 name = "rust-kzg-bn254-prover"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed1af11c66ca1e505ef959e398e86c39d9b2b20d0aa9a45a62e053a8a9044209"
+source = "git+https://github.com/Layr-Labs/rust-kzg-bn254.git?rev=60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6#60b2bdbcd08aa4e4aa309b408a595f1e7bbe41a6"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -4253,7 +4251,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4774,28 +4772,20 @@ dependencies = [
  "alloy-eips",
  "alloy-network",
  "alloy-primitives",
- "alloy-provider",
- "alloy-rpc-client",
- "alloy-rpc-types",
  "alloy-rpc-types-eth",
  "alloy-signer",
  "alloy-signer-local",
- "alloy-sol-types",
  "alloy-transport",
  "anyhow",
- "ark-bn254",
- "ark-serialize 0.5.0",
  "async-trait",
- "bincode 2.0.1",
  "borsh",
  "bytes",
  "derive_more 2.0.1",
- "eigenda",
+ "eigenda-ethereum",
+ "eigenda-verification",
  "futures",
- "hashbrown 0.15.5",
  "hex",
  "reth-trie-common",
- "rust-kzg-bn254-prover",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -4805,7 +4795,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.20",
  "tracing-tree",
- "url",
 ]
 
 [[package]]
@@ -4863,7 +4852,7 @@ version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=b486610bbad3e39d5785b6009c5d9ca9ab9dec9e#b486610bbad3e39d5785b6009c5d9ca9ab9dec9e"
 dependencies = [
  "anyhow",
- "bincode 1.3.3",
+ "bincode",
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "serde",
@@ -4876,7 +4865,7 @@ version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=b486610bbad3e39d5785b6009c5d9ca9ab9dec9e#b486610bbad3e39d5785b6009c5d9ca9ab9dec9e"
 dependencies = [
  "anyhow",
- "bincode 1.3.3",
+ "bincode",
  "borsh",
  "digest 0.10.7",
  "ed25519-dalek",
@@ -5023,7 +5012,7 @@ version = "0.3.0"
 source = "git+https://github.com/Sovereign-Labs/sovereign-sdk.git?rev=b486610bbad3e39d5785b6009c5d9ca9ab9dec9e#b486610bbad3e39d5785b6009c5d9ca9ab9dec9e"
 dependencies = [
  "anyhow",
- "bincode 1.3.3",
+ "bincode",
  "borsh",
  "bytemuck",
  "digest 0.10.7",
@@ -5376,7 +5365,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5754,12 +5743,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
-name = "unty"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
-
-[[package]]
 name = "unwrap-infallible"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5794,12 +5777,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "virtue"
-version = "0.0.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "wait-timeout"
@@ -5996,7 +5973,7 @@ version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
 dependencies = [
- "windows-targets 0.53.3",
+ "windows-targets 0.53.4",
 ]
 
 [[package]]
@@ -6017,11 +5994,11 @@ dependencies = [
 
 [[package]]
 name = "windows-targets"
-version = "0.53.3"
+version = "0.53.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5fe6031c4041849d7c496a8ded650796e7b6ecc19df1a431c1a363342e5dc91"
+checksum = "2d42b7b7f66d2a06854650af09cfdf8713e427a439c97ad65a6375318033ac4b"
 dependencies = [
- "windows-link 0.1.3",
+ "windows-link 0.2.0",
  "windows_aarch64_gnullvm 0.53.0",
  "windows_aarch64_msvc 0.53.0",
  "windows_i686_gnu 0.53.0",

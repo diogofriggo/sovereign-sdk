@@ -27,8 +27,8 @@ use crate::common::setup_adapter;
 async fn submit_extract_verify_e2e() {
     common::tracing::init_tracing();
 
-    let (proxy_url, _proxy_container) = start_proxy(ProxyNetwork::Sepolia).await.unwrap();
-    let (service, verifier) = setup_adapter(proxy_url).await.unwrap();
+    let (url, _container) = start_proxy(ProxyNetwork::Sepolia).await.unwrap();
+    let (service, verifier) = setup_adapter(url).await.unwrap();
 
     let mut rng = rand::thread_rng();
     let blobs_size_range = 1024..2048;

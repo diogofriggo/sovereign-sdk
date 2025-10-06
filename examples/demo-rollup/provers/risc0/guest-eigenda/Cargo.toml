@@ -12,7 +12,7 @@ const-rollup-config = { path = "../../../../const-rollup-config" }
 demo-stf = { path = "../../../stf" }
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 risc0-zkvm-platform = { version = "2.2.1", features = ["sys-getenv"] }
-sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e", features = ["evm"] }
 sov-eigenda-adapter = { path = "../../../../../crates/sov-eigenda-adapter/." }
 sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
@@ -50,7 +50,6 @@ opt-level = 3
 bench = [
   "sov-modules-api/bench",
   "sov-state/bench",
-  "sov-modules-stf-blueprint/bench",
   "sov-risc0-adapter/bench",
 ]
 bincode = ["sov-risc0-adapter/bincode"]
