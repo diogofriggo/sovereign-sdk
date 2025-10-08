@@ -70,7 +70,7 @@ pub enum EigenDaServiceError {
 /// for block information and finality status.
 #[derive(Debug, Clone)]
 pub struct EigenDaService {
-    /// Client for interacting with the EigenDA proxy node
+    /// Client for interacting with the EigenDA proxy
     proxy: ProxyClient,
 
     /// Provider for interacting with an Ethereum node
