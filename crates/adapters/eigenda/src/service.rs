@@ -6,21 +6,21 @@ use std::ops::Not;
 use std::str::FromStr;
 use std::time::Duration;
 
-use alloy_consensus::TxEip4844;
 use alloy_consensus::transaction::SignerRecoverable;
+use alloy_consensus::{Transaction, TxEip4844};
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_eth::{Transaction, TransactionRequest};
+use alloy_rpc_types_eth::TransactionRequest;
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
-use eigenda_ethereum::extraction::{CertExtractionError, extract_certificate};
 use eigenda_ethereum::provider::EigenDaProvider;
 use eigenda_proxy::{ProxyClient, ProxyError};
 use eigenda_verification::cert::StandardCommitment;
+use eigenda_verification::extraction::CertExtractionError;
 use eigenda_verification::verification::blob::codec::decode_encoded_payload;
 use eigenda_verification::verification::{cert, verify_cert_recency};
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,7 @@ pub enum EigenDaServiceError {
 
     /// Error occurred during on-chain data extraction (storage proofs, contract data)
     #[error(transparent)]
-    WrapCertExtractionError(#[from] CertExtractionError),
+    CertExtractionError(#[from] CertExtractionError),
 }
 
 /// EigenDaService is responsible for interacting with the EigenDA data availability layer.
@@ -186,7 +186,7 @@ impl EigenDaService {
     async fn process_transactions_with_metadata(
         &self,
         header: &EthereumBlockHeader,
-        transactions: Vec<Transaction>,
+        transactions: Vec<alloy_rpc_types_eth::Transaction>,
     ) -> Result<Vec<(TransactionWithBlob, Option<EthereumBlockHeader>)>, EigenDaServiceError> {
         let mut block_transactions = Vec::with_capacity(transactions.len());
 
@@ -209,8 +209,7 @@ impl EigenDaService {
                 continue;
             }
 
-            // Certificate is malformed
-            let Some(cert) = extract_certificate(&tx) else {
+            let Some(signed_tx) = tx.as_eip1559() else {
                 block_transactions.push((
                     TransactionWithBlob {
                         tx,
@@ -220,6 +219,26 @@ impl EigenDaService {
                     None,
                 ));
                 continue;
+            };
+
+            let rlp_bytes = signed_tx.input();
+
+            // Certificate is malformed
+            let cert = match StandardCommitment::from_rlp_bytes(rlp_bytes) {
+                Ok(cert) => cert,
+                Err(err) => {
+                    debug!(?err, "Certificate deserialization failed. Ignoring.");
+
+                    block_transactions.push((
+                        TransactionWithBlob {
+                            tx,
+                            encoded_payload: None,
+                            cert_state: None,
+                        },
+                        None,
+                    ));
+                    continue;
+                }
             };
 
             // Verify certificate recency
@@ -494,8 +513,8 @@ impl DaService for EigenDaService {
 mod rbn {
     use std::future::ready;
 
-    use eigenda_ethereum::extraction::CertStateData;
     use eigenda_verification::cert::StandardCommitment;
+    use eigenda_verification::extraction::CertStateData;
     use futures::future::Either;
     use futures::{StreamExt, TryStreamExt, stream, try_join};
     use sov_rollup_interface::da::BlockHeaderTrait;

@@ -3,8 +3,7 @@ pub mod tracing;
 
 use std::str::FromStr;
 
-use eigenda_ethereum::provider::EigenDaProviderConfig;
-use eigenda_ethereum::provider::Network;
+use eigenda_ethereum::provider::{EigenDaProviderConfig, Network};
 use eigenda_proxy::EigenDaProxyConfig;
 use sov_eigenda_adapter::service::config::EigenDaConfig;
 use sov_eigenda_adapter::service::{EigenDaService, EigenDaServiceError};

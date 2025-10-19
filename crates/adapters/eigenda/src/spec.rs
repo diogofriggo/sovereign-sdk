@@ -7,7 +7,7 @@ use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, FixedBytes, TxHash, wrap_fixed_bytes};
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
-use eigenda_ethereum::extraction::CertStateData;
+use eigenda_verification::extraction::CertStateData;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
