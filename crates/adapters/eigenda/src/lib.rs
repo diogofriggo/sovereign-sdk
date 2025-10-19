@@ -6,9 +6,9 @@
 //! ## Architecture
 //!
 //! This is the main orchestration crate that coordinates several specialized crates:
-//! - [`eigenda_ethereum`]: Handles Ethereum contract interaction and state extraction
+//! - [`eigenda_ethereum`]: Handles Ethereum contract interaction and provider utilities
 //! - [`eigenda_proxy`]: Manages communication with EigenDA proxy services
-//! - [`eigenda_verification`]: Provides certificate validation and blob verification
+//! - [`eigenda_verification`]: Provides certificate parsing, state extraction, and cryptographic verification
 //!
 //! The main entry points are the [`service::EigenDaService`] and [`verifier::EigenDaVerifier`]
 //! implementations that provide the Sovereign SDK integration.
