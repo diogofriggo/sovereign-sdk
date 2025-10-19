@@ -19,6 +19,16 @@ pub fn celestia_risc0_host_args() -> Arc<&'static [u8]> {
         return Arc::new(vec![].leak());
     }
 
+    Arc::new(risc0::ROLLUP_EIGENDA_ELF)
+}
+
+/// Returns the risc0 host arguments for a rollup with eigen da. This is the code that is zk-proven by the rollup
+pub fn eigenda_risc0_host_args() -> Arc<&'static [u8]> {
+    // Don't try to read the elf file if we're not building the risc0 guest!
+    if should_skip_guest_build() {
+        return Arc::new(vec![].leak());
+    }
+
     Arc::new(risc0::ROLLUP_ELF)
 }
 

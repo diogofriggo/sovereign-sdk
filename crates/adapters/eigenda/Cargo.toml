@@ -1,7 +1,16 @@
 [package]
-edition = "2024"
 name = "sov-eigenda-adapter"
-version = "0.1.0"
+description = "EigenDA adapter for Sovereign SDK rollups"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
 
 [dependencies]
 alloy-consensus = { workspace = true, features = [
@@ -10,11 +19,12 @@ alloy-consensus = { workspace = true, features = [
   "k256",
 ] }
 alloy-eips = { workspace = true }
-alloy-network = { workspace = true }
+alloy-network = { version = "1.0.37", default-features = false }
 alloy-primitives = { workspace = true, features = ["serde"] }
-alloy-rpc-types-eth = { workspace = true }
-alloy-signer = { workspace = true }
-alloy-signer-local = { workspace = true }
+alloy-rpc-types-eth = { version = "1.0.37", default-features = false }
+alloy-serde = { workspace = true }
+alloy-signer = { version = "1.0.37", default-features = false }
+alloy-signer-local = { version = "1.0.37", default-features = false }
 alloy-transport = { workspace = true }
 anyhow = { workspace = true }
 arbitrary = { workspace = true, optional = true }
@@ -23,13 +33,13 @@ backon = { workspace = true, optional = true }
 borsh = { workspace = true, features = ["bytes"] }
 bytes = { workspace = true }
 derive_more = { workspace = true }
-eigenda-ethereum = { path = "../eigenda-ethereum" }
-eigenda-proxy = { path = "../eigenda-proxy", optional = true }
-eigenda-verification = { path = "../eigenda-verification" }
+eigenda-ethereum = { git = "https://github.com/diogofriggo/eigenda.git", branch = "master" }
+eigenda-proxy = { git = "https://github.com/diogofriggo/eigenda.git", branch = "master", optional = true }
+eigenda-verification = { git = "https://github.com/diogofriggo/eigenda.git", branch = "master" }
 futures = { workspace = true }
 hex = { workspace = true }
 proptest = { workspace = true, features = ["alloc", "std"], optional = true }
-reth-trie-common = { workspace = true, features = ["serde"] }
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.8.2", default-features = false, features = ["serde"] }
 schemars = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["alloc", "derive"] }
 serde_json = { workspace = true }
@@ -42,7 +52,7 @@ tracing-subscriber = { workspace = true, features = [
   "env-filter",
   "local-time",
 ] }
-tracing-tree = { workspace = true }
+tracing-tree = { version = "0.4" }
 
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["arbitrary"] }

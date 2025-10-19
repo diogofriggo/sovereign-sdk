@@ -8,11 +8,10 @@ version = "0.3.0"
 [workspace]
 
 [dependencies]
-const-rollup-config = { path = "../../../../const-rollup-config" }
 demo-stf = { path = "../../../stf" }
 
 sov-address = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
-sov-eigenda-adapter = { path = "../../../../../crates/sov-eigenda-adapter/." }
+sov-eigenda-adapter = { path = "../../../../../crates/adapters/eigenda/." }
 sov-mock-zkvm = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 sov-modules-stf-blueprint = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }

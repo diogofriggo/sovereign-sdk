@@ -85,6 +85,7 @@ members = [
     # TODO: https://github.com/Sovereign-Labs/sovereign-sdk-wip/issues/498
     # "crates/adapters/avail",
     "crates/adapters/celestia",
+    "crates/adapters/eigenda",
     "crates/adapters/risc0",
     "crates/adapters/sp1",
 ]
@@ -124,6 +125,7 @@ sov-soak-testing-lib = { path = "crates/utils/sov-soak-testing-lib", default-fea
 sov-eth-client = { path = "crates/utils/sov-eth-client", default-features = false, version = "0.3" }
 sov-blob-sender = { path = "crates/full-node/sov-blob-sender", default-features = false, version = "0.3" }
 sov-celestia-adapter = { path = "crates/adapters/celestia", default-features = false, version = "0.3" }
+sov-eigenda-adapter = { path = "crates/adapters/eigenda", default-features = false, version = "0.3" }
 sov-risc0-adapter = { path = "crates/adapters/risc0", default-features = false, version = "0.3" }
 sov-sp1-adapter = { path = "crates/adapters/sp1", default-features = false, version = "0.3" }
 sov-ethereum = { path = "crates/full-node/sov-ethereum", default-features = false, version = "0.3" }
@@ -261,7 +263,7 @@ utoipa = "4.2"
 utoipa-swagger-ui = { git = "https://github.com/juhaku/utoipa.git", rev = "a985d8c1340f80ab69b2b0e5de799df98d567732", features = ["axum", "debug-embed"] }
 unwrap-infallible = "0.1.5"
 bech32 = { version = "0.11" }
-derive_more = { version = "1.0", default-features = false, features = ["std"] }
+derive_more = { version = "2.0", default-features = false, features = ["std"] }
 clap = { version = "4.5.16", features = ["derive"] }
 toml = { version = "0.8.19", features = ["parse"] }
 jsonrpsee = { version = "0.26.0" }

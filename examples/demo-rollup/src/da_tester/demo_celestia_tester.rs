@@ -3,7 +3,7 @@ use clap::Parser;
 use sov_address::MultiAddressEvm;
 use sov_celestia_adapter::verifier::RollupParams;
 use sov_celestia_adapter::CelestiaService;
-use sov_demo_rollup::{ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE};
+use sov_demo_rollup::{CELESTIA_ROLLUP_BATCH_NAMESPACE, CELESTIA_ROLLUP_PROOF_NAMESPACE};
 use sov_modules_rollup_blueprint::logging::initialize_logging;
 use sov_stf_runner::{from_toml_path, RollupConfig};
 
@@ -40,8 +40,8 @@ async fn main() -> anyhow::Result<()> {
     let da_service = CelestiaService::new(
         rollup_config.da.clone(),
         RollupParams {
-            rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-            rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
+            rollup_batch_namespace: CELESTIA_ROLLUP_BATCH_NAMESPACE,
+            rollup_proof_namespace: CELESTIA_ROLLUP_PROOF_NAMESPACE,
         },
     )
     .await;

@@ -37,5 +37,6 @@ fn get_guest_options() -> HashMap<&'static str, risc0_build::GuestOptions> {
         .build()
         .unwrap();
     guest_pkg_to_options.insert("sov-demo-prover-guest-mock-risc0", guest_options);
+    // guest_pkg_to_options.insert("sov-demo-prover-guest-eigenda-risc0", guest_options);
     guest_pkg_to_options
 }

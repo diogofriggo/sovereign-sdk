@@ -28,7 +28,7 @@ use sov_sequencer::{ProofBlobSender, Sequencer};
 use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
 use sov_stf_runner::RollupConfig;
 
-use crate::{eth_dev_signer, CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE};
+use crate::{EIGENDA_CERT_RECENCY_WINDOW, EIGENDA_ROLLUP_BATCH_NAMESPACE, EIGENDA_ROLLUP_PROOF_NAMESPACE, eth_dev_signer};
 
 /// Rollup with EigenDa
 #[derive(Default)]
@@ -109,9 +109,9 @@ impl FullNodeBlueprint<Native> for EigenDaDemoRollup<Native> {
         EigenDaService::new(
             rollup_config.da.clone(),
             RollupParams {
-                rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-                rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
-                cert_recency_window: CERT_RECENCY_WINDOW,
+                rollup_batch_namespace: EIGENDA_ROLLUP_BATCH_NAMESPACE,
+                rollup_proof_namespace: EIGENDA_ROLLUP_PROOF_NAMESPACE,
+                cert_recency_window: EIGENDA_CERT_RECENCY_WINDOW,
             },
         )
         .await
@@ -121,13 +121,17 @@ impl FullNodeBlueprint<Native> for EigenDaDemoRollup<Native> {
     async fn sequencer_additional_apis<Seq>(
         &self,
         sequencer: Arc<Seq>,
-        _rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
+        rollup_config: &RollupConfig<<Self::Spec as Spec>::Address, Self::DaService>,
     ) -> anyhow::Result<NodeEndpoints>
     where
         Seq: Sequencer<Spec = Self::Spec, Rt = Self::Runtime, Da = Self::DaService>,
     {
         let eth_signer = eth_dev_signer();
-        let eth_rpc_config = EthRpcConfig { eth_signer };
+        let eth_rpc_config = EthRpcConfig {
+            eth_signer,
+            extension: rollup_config.extension_or_panic(),
+            buffer_raw_txs: true,
+        };
 
         Ok(NodeEndpoints {
             jsonrpsee_module: sov_ethereum::get_ethereum_rpc(eth_rpc_config, sequencer)
@@ -148,9 +152,9 @@ impl FullNodeBlueprint<Native> for EigenDaDemoRollup<Native> {
         let outer_vm = MockZkvmHost::new_non_blocking();
 
         let rollup_params = RollupParams {
-            rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-            rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
-            cert_recency_window: CERT_RECENCY_WINDOW,
+            rollup_batch_namespace: EIGENDA_ROLLUP_BATCH_NAMESPACE,
+            rollup_proof_namespace: EIGENDA_ROLLUP_PROOF_NAMESPACE,
+            cert_recency_window: EIGENDA_CERT_RECENCY_WINDOW,
         };
 
         let da_verifier = EigenDaVerifier::new(rollup_params);

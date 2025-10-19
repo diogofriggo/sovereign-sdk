@@ -25,6 +25,13 @@ fn main() -> anyhow::Result<()> {
     build_program_with_args(
         "./guest-celestia",
         BuildArgs {
+            features: features.clone(),
+            ..Default::default()
+        },
+    );
+    build_program_with_args(
+        "./guest-eigenda",
+        BuildArgs {
             features,
             ..Default::default()
         },

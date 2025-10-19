@@ -17,6 +17,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     type S = sov_modules_api::configurable_spec::ConfigurableSpec<
+        // EigenDaSpec,
         MockDaSpec,
         MockZkvm,
         MockZkvm,

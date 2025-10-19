@@ -1,22 +1,26 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use const_rollup_config::{
-    CERT_RECENCY_WINDOW, ROLLUP_BATCH_NAMESPACE_RAW, ROLLUP_PROOF_NAMESPACE_RAW,
-};
-use demo_stf::StfVerifier;
 use demo_stf::runtime::Runtime;
+use demo_stf::StfVerifier;
 use sov_address::MultiAddressEvm;
 use sov_eigenda_adapter::spec::{EigenDaSpec, NamespaceId, RollupParams};
 use sov_eigenda_adapter::verifier::EigenDaVerifier;
 use sov_mock_zkvm::MockZkvm;
 use sov_modules_api::configurable_spec::ConfigurableSpec;
 use sov_modules_api::execution_mode::Zk;
+use sov_modules_api::macros::config_value;
 use sov_modules_stf_blueprint::StfBlueprint;
 use sov_rollup_interface::da::DaVerifier;
-use sov_sp1_adapter::SP1;
 use sov_sp1_adapter::guest::SP1Guest;
+use sov_sp1_adapter::SP1;
 use sov_state::ZkStorage;
+
+pub const EIGENDA_ROLLUP_BATCH_NAMESPACE: NamespaceId =
+    NamespaceId::from_bytes(config_value!("EIGENDA_BATCH_NAMESPACE"));
+pub const EIGENDA_ROLLUP_PROOF_NAMESPACE: NamespaceId =
+    NamespaceId::from_bytes(config_value!("EIGENDA_PROOF_NAMESPACE"));
+pub const EIGENDA_CERT_RECENCY_WINDOW: u64 = config_value!("EIGENDA_CERT_RECENCY_WINDOW");
 
 pub fn main() {
     let guest = SP1Guest::new();
@@ -27,9 +31,9 @@ pub fn main() {
     > = StfBlueprint::new();
 
     let rollup_params = RollupParams {
-        rollup_batch_namespace: NamespaceId::from(ROLLUP_BATCH_NAMESPACE_RAW),
-        rollup_proof_namespace: NamespaceId::from(ROLLUP_PROOF_NAMESPACE_RAW),
-        cert_recency_window: CERT_RECENCY_WINDOW,
+        rollup_batch_namespace: EIGENDA_ROLLUP_BATCH_NAMESPACE,
+        rollup_proof_namespace: EIGENDA_ROLLUP_PROOF_NAMESPACE,
+        cert_recency_window: EIGENDA_CERT_RECENCY_WINDOW,
     };
 
     let stf_verifier =

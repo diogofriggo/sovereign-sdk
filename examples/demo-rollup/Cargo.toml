@@ -16,6 +16,7 @@ workspace = true
 # non-optional dependencies
 sov-address = { workspace = true, features = ["evm"] }
 sov-celestia-adapter = { workspace = true, features = ["native"] }
+sov-eigenda-adapter = { workspace = true, features = ["native"] }
 sov-mock-da = { workspace = true, features = ["native"] }
 sov-rollup-interface = { workspace = true, features = ["native"] }
 sov-stf-runner = { workspace = true }
@@ -121,7 +122,6 @@ alloy-rpc-types-trace = { workspace = true }
 alloy-pubsub = "1.0"
 alloy-provider = { workspace = true, features = ["debug-api"] }
 sov-rpc-eth-types = { workspace = true}
-
 
 reqwest = { workspace = true }
 prettytable-rs = "0.10"

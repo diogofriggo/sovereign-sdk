@@ -6,8 +6,10 @@ use clap::Parser;
 use demo_stf::genesis_config::GenesisPaths;
 use sov_address::MultiAddressEvm;
 use sov_celestia_adapter::CelestiaService;
+use sov_eigenda_adapter::service::EigenDaService;
 use sov_demo_rollup::{
-    celestia_risc0_host_args, mock_da_risc0_host_args, CelestiaDemoRollup, CelestiaNomtDemoRollup,
+    celestia_risc0_host_args, mock_da_risc0_host_args, eigenda_risc0_host_args, CelestiaDemoRollup, CelestiaNomtDemoRollup,
+    EigenDaDemoRollup, EigenDaNomtDemoRollup,
     MockDemoRollup, MockNomtDemoRollup,
 };
 use sov_mock_da::storable::StorableMockDaService;
@@ -58,6 +60,7 @@ struct Args {
 #[derive(clap::ValueEnum, Clone, Debug)]
 enum SupportedDaLayer {
     Celestia,
+    EigenDa,
     Mock,
 }
 
@@ -101,51 +104,65 @@ async fn run() -> anyhow::Result<()> {
 
     match (args.da_layer, args.storage) {
         (SupportedDaLayer::Mock, SupportedStorage::Jmt) => {
-            let prover_config = prover_config_disc
-                .map(|config_disc| config_disc.into_config(mock_da_risc0_host_args()));
-            let rollup = new_rollup_with_mock_da_and_jmt(
-                &GenesisPaths::from_dir(&args.genesis_config_dir),
-                rollup_config_path,
-                prover_config,
-                start_at_rollup_height,
-                stop_at_rollup_height,
-            )
-            .await
-            .context("Failed to initialize MockDa rollup")?;
-            rollup.run().await
-        }
+                let prover_config = prover_config_disc
+                    .map(|config_disc| config_disc.into_config(mock_da_risc0_host_args()));
+                let rollup = new_rollup_with_mock_da_and_jmt(
+                    &GenesisPaths::from_dir(&args.genesis_config_dir),
+                    rollup_config_path,
+                    prover_config,
+                    start_at_rollup_height,
+                    stop_at_rollup_height,
+                )
+                .await
+                .context("Failed to initialize MockDa rollup")?;
+                rollup.run().await
+            }
         (SupportedDaLayer::Mock, SupportedStorage::Nomt) => {
-            let prover_config = prover_config_disc
-                .map(|config_disc| config_disc.into_config(mock_da_risc0_host_args()));
-            let rollup = new_rollup_with_mock_da_and_nomt(
-                &GenesisPaths::from_dir(&args.genesis_config_dir),
-                rollup_config_path,
-                prover_config,
-                start_at_rollup_height,
-                stop_at_rollup_height,
-            )
-            .await
-            .context("Failed to initialize NOMT based MockDa rollup")?;
-            rollup.run().await
-        }
+                let prover_config = prover_config_disc
+                    .map(|config_disc| config_disc.into_config(mock_da_risc0_host_args()));
+                let rollup = new_rollup_with_mock_da_and_nomt(
+                    &GenesisPaths::from_dir(&args.genesis_config_dir),
+                    rollup_config_path,
+                    prover_config,
+                    start_at_rollup_height,
+                    stop_at_rollup_height,
+                )
+                .await
+                .context("Failed to initialize NOMT based MockDa rollup")?;
+                rollup.run().await
+            }
         (SupportedDaLayer::Celestia, SupportedStorage::Jmt) => {
-            let prover_config = prover_config_disc
-                .map(|config_disc| config_disc.into_config(celestia_risc0_host_args()));
-            let rollup = new_rollup_with_celestia_da(
-                &GenesisPaths::from_dir(&args.genesis_config_dir),
-                rollup_config_path,
-                prover_config,
-                start_at_rollup_height,
-                stop_at_rollup_height,
-            )
-            .await
-            .context("Failed to initialize Celestia rollup")?;
-            rollup.run().await
-        }
+                let prover_config = prover_config_disc
+                    .map(|config_disc| config_disc.into_config(celestia_risc0_host_args()));
+                let rollup = new_rollup_with_celestia_da(
+                    &GenesisPaths::from_dir(&args.genesis_config_dir),
+                    rollup_config_path,
+                    prover_config,
+                    start_at_rollup_height,
+                    stop_at_rollup_height,
+                )
+                .await
+                .context("Failed to initialize Celestia rollup")?;
+                rollup.run().await
+            }
         (SupportedDaLayer::Celestia, SupportedStorage::Nomt) => {
+                let prover_config = prover_config_disc
+                    .map(|config_disc| config_disc.into_config(celestia_risc0_host_args()));
+                let rollup = new_rollup_with_celestia_da_and_nomt(
+                    &GenesisPaths::from_dir(&args.genesis_config_dir),
+                    rollup_config_path,
+                    prover_config,
+                    start_at_rollup_height,
+                    stop_at_rollup_height,
+                )
+                .await
+                .context("Failed to initialize Celestia rollup")?;
+                rollup.run().await
+            }
+        (SupportedDaLayer::EigenDa, SupportedStorage::Jmt) => {
             let prover_config = prover_config_disc
-                .map(|config_disc| config_disc.into_config(celestia_risc0_host_args()));
-            let rollup = new_rollup_with_celestia_da_and_nomt(
+                .map(|config_disc| config_disc.into_config(eigenda_risc0_host_args()));
+            let rollup = new_rollup_with_eigen_da(
                 &GenesisPaths::from_dir(&args.genesis_config_dir),
                 rollup_config_path,
                 prover_config,
@@ -153,7 +170,22 @@ async fn run() -> anyhow::Result<()> {
                 stop_at_rollup_height,
             )
             .await
-            .context("Failed to initialize Celestia rollup")?;
+            .context("Failed to initialize EigenDa rollup")?;
+            rollup.run().await
+
+        }
+        (SupportedDaLayer::EigenDa, SupportedStorage::Nomt) => {
+            let prover_config = prover_config_disc
+                .map(|config_disc| config_disc.into_config(eigenda_risc0_host_args()));
+            let rollup = new_rollup_with_eigen_da_and_nomt(
+                &GenesisPaths::from_dir(&args.genesis_config_dir),
+                rollup_config_path,
+                prover_config,
+                start_at_rollup_height,
+                stop_at_rollup_height,
+            )
+            .await
+            .context("Failed to initialize EigenDa rollup")?;
             rollup.run().await
         }
     }
@@ -282,6 +314,58 @@ async fn new_rollup_with_mock_da_and_nomt(
             prover_config,
             stop_at_rollup_height,
             start_at_rollup_height,
+        )
+        .await
+}
+
+async fn new_rollup_with_eigen_da(
+    rt_genesis_paths: &GenesisPaths,
+    rollup_config_path: &str,
+    prover_config: Option<RollupProverConfig<Risc0>>,
+    start_at_rollup_height: Option<RollupHeight>,
+    stop_at_rollup_height: Option<RollupHeight>,
+) -> anyhow::Result<Rollup<EigenDaDemoRollup<Native>, Native>> {
+    debug!(config_path = rollup_config_path, "Starting EigenDa rollup");
+
+    let rollup_config: RollupConfig<MultiAddressEvm, EigenDaService> =
+        from_toml_path(rollup_config_path).with_context(|| {
+            format!("Failed to read rollup configuration from {rollup_config_path}")
+        })?;
+
+    let eigenda_rollup = EigenDaDemoRollup::<Native>::default();
+    eigenda_rollup
+        .create_new_rollup(
+            rt_genesis_paths,
+            rollup_config,
+            prover_config,
+            start_at_rollup_height,
+            stop_at_rollup_height,
+        )
+        .await
+}
+
+async fn new_rollup_with_eigen_da_and_nomt(
+    rt_genesis_paths: &GenesisPaths,
+    rollup_config_path: &str,
+    prover_config: Option<RollupProverConfig<Risc0>>,
+    start_at_rollup_height: Option<RollupHeight>,
+    stop_at_rollup_height: Option<RollupHeight>,
+) -> anyhow::Result<Rollup<EigenDaNomtDemoRollup<Native>, Native>> {
+    debug!(config_path = rollup_config_path, "Starting EigenDa rollup");
+
+    let rollup_config: RollupConfig<MultiAddressEvm, EigenDaService> =
+        from_toml_path(rollup_config_path).with_context(|| {
+            format!("Failed to read rollup configuration from {rollup_config_path}")
+        })?;
+
+    let eigenda_rollup = EigenDaNomtDemoRollup::<Native>::default();
+    eigenda_rollup
+        .create_new_rollup(
+            rt_genesis_paths,
+            rollup_config,
+            prover_config,
+            start_at_rollup_height,
+            stop_at_rollup_height,
         )
         .await
 }

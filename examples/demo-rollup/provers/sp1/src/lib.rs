@@ -27,4 +27,8 @@ lazy_static! {
         "{}/guest-celestia/elf/riscv32im-succinct-zkvm-elf",
         env!("CARGO_MANIFEST_DIR")
     ));
+    pub static ref SP1_GUEST_EIGENDA_ELF: &'static [u8] = load_elf(&format!(
+        "{}/guest-eigenda/elf/riscv32im-succinct-zkvm-elf",
+        env!("CARGO_MANIFEST_DIR")
+    ));
 }

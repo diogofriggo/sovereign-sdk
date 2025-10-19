@@ -1,41 +1,17 @@
 [gas.Bank]
-create_token = [4, 4]
-transfer = [5, 5]
 burn = [2, 2]
-mint = [2, 2]
+create_token = [4, 4]
 freeze = [1, 1]
+mint = [2, 2]
+transfer = [5, 5]
 
 
 [constants]
 # We use the ID 4321 for demo purposes. Change this value before deploying!
 CHAIN_ID = 4321
 CHAIN_NAME = "TestChain"
-
-# The namespace used by the rollup to store its data.
-# Using byte_string to convert "sov-test-b" to ASCII bytes
-CELESTIA_BATCH_NAMESPACE = { byte_string = "sov-test-b", type = "[u8; 10]" }
-
-# The namespace used by the rollup to store aggregated ZK proofs.
-# This is "sov-test-p" encoded as ASCII bytes.
-# "hex" format is used as an example, that it is possible to define namespace as any sequence of bytes.
-# `python3 -c "import sys; print('0x' + sys.argv[1].encode().hex())" "sov-test-p"`
-CELESTIA_PROOF_NAMESPACE = { hex = "0x736f762d746573742d70", type = "[u8; 10]" }
-
-# The namespace used by the rollup to store its data.
-# "hex" format is used as an example, that it is possible to define namespace as any sequence of bytes.
-EIGENDA_BATCH_NAMESPACE = { hex = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", type = "[u8; 20]" }
-
-# The namespace used by the rollup to store aggregated ZK proofs.
-# "hex" format is used as an example, that it is possible to define namespace as any sequence of bytes.
-EIGENDA_PROOF_NAMESPACE = { hex = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", type = "[u8; 20]" }
-
-# Cert recency window used when validating EigenDa certificates
-EIGENDA_CERT_RECENCY_WINDOW = 3200
-
 # We will keep only this many blocks in the EVM module.
 EVM_BLOCK_PRUNING_THRESHOLD = 10000
-# Rollup for production and EVM for benchmarks
-EVM_GAS_METERING_MODE = "Rollup"
 # How many rollup blocks to wait before terminating setup mode. While setup mode is enabled,
 # the rollup does not charge gas. This is useful when initializing the rollup with a bridged gas token.
 SETUP_MODE_TERMINATION_HEIGHT = 0 # Disable setup mode entirely by default.
@@ -46,14 +22,14 @@ SETUP_MODE_TERMINATION_HEIGHT = 0 # Disable setup mode entirely by default.
 # on the speed of inclusion for forced transactions, since they will always be included ASAP.)
 # Setting this parameter to 0 disables soft-confirmations entirely.
 # Note: Should be not copied to rollup starter or any other configuration planned for production.
-DEFERRED_SLOTS_COUNT = 120
+DEFERRED_SLOTS_COUNT = 300
 # The maximum number of visible slots that the sequencer can advance the rollup in a single slot.
 # Larger values of this parameter mean that the soft-confirmations are less vulnerable to congestion on the DA layer,
 # but make it correspondingly easier for a malicious sequencer to grief other sequencers.
 MAX_VISIBLE_HEIGHT_INCREASE_PER_SLOT = 10
 # How many *rollup blocks* we wait before making a state root visible to the rollup.
 # This value should always be set to at least 1
-STATE_ROOT_DELAY_BLOCKS = 3
+STATE_ROOT_DELAY_BLOCKS = 1
 # How many blobs from unregistered sequencers we will accept per slot
 # We can't slash misbehaving senders because they aren't a registered sequencer with a stake so
 # this serves as protection against spam.
@@ -83,11 +59,11 @@ ADDRESS_PREFIX = { const = "sov" }
 # The cost of credential id calculation.
 GAS_TO_CHARGE_FOR_CREDENTIAL_CALCULATION = [0, 0]
 # The cost of a storage access operation.
-GAS_TO_CHARGE_PER_STORAGE_ACCESS = [1, 1]
-GAS_TO_CHARGE_PER_READ = [1, 1]
+BIAS_STORAGE_UPDATE = [1, 1]
 GAS_TO_CHARGE_PER_BYTE_READ = [1, 1]
 GAS_TO_CHARGE_PER_BYTE_STORAGE_UPDATE = [1, 1]
-BIAS_STORAGE_UPDATE = [1, 1]
+GAS_TO_CHARGE_PER_READ = [1, 1]
+GAS_TO_CHARGE_PER_STORAGE_ACCESS = [1, 1]
 
 # An example of setting a custom gas price for particular operation.
 # This is consumed in by the `call` implementation `sov-test-modules/gas/lib.rs`.
@@ -122,24 +98,24 @@ PROCESS_TX_PRE_EXEC_GAS_PER_TX_BYTE = [1, 1]
 # --- End Gas parameters to specify how to charge gas for signature verification ---
 
 # The cost of deserializing a message using Borsh
-DEFAULT_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 BIAS_BORSH_DESERIALIZATION = [1, 1]
+DEFAULT_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 
 # The cost of deserializing a tx using Borsh
-TX_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 TX_BIAS_BORSH_DESERIALIZATION = [1, 1]
+TX_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 
 # The cost of deserializing a tx using JSON
-TX_GAS_TO_CHARGE_PER_BYTE_JSON_DESERIALIZATION = [1, 1]
 TX_BIAS_JSON_DESERIALIZATION = [1, 1]
+TX_GAS_TO_CHARGE_PER_BYTE_JSON_DESERIALIZATION = [1, 1]
 
 # The cost of deserializing a proof using Borsh
-PROOF_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 PROOF_BIAS_BORSH_DESERIALIZATION = [1, 1]
+PROOF_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 
 # The cost of deserializing a string using Borsh
-STRING_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 STRING_BIAS_BORSH_DESERIALIZATION = [1, 1]
+STRING_GAS_TO_CHARGE_PER_BYTE_BORSH_DESERIALIZATION = [1, 1]
 
 # The percentage of the "base fee" that is burned when a transaction is processed.
 # The portion that is not burned is awarded to provers and/or attesters on the network.
@@ -164,51 +140,3 @@ ELASTICITY_MULTIPLIER = 2
 # --- Hyperlane constants ---
 HYPERLANE_BRIDGE_DOMAIN = 5555
 # --- End Hyperlane constants ---
-
-
-BANK_DISCRIMINANT = 0
-ACCOUNTS_DISCRIMINANT = 1
-CHAIN_STATE_DISCRIMINANT = 2
-OPERATOR_INCENTIVES_DISCRIMINANT = 3
-BLOB_STORAGE_DISCRIMINANT = 4
-PROVER_INCENTIVES_DISCRIMINANT = 5
-SEQUENCER_REGISTRY_DISCRIMINANT = 6
-UNIQUENESS_DISCRIMINANT = 7
-HYPERLANE_DISCRIMINANT = 8
-ATTESTER_INCENTIVES_DISCRIMINANT = 9
-BLOB_SELECTOR_DISCRIMINANT = 10
-EVM_DISCRIMINANT = 11
-MAILBOX_DISCRIMINANT = 12
-INTERCHAIN_GAS_PAYMASTER_DISCRIMINANT = 13
-MERKLE_TREE_HOOK_DISCRIMINANT = 14
-WARP_DISCRIMINANT = 15
-PAYMASTER_DISCRIMINANT = 16
-REVENUE_SHARE_DISCRIMINANT = 17
-
-
-# Test modules
-STATE_CONSISTENCY_DISCRIMINANT = 231
-MODULE_WITH_VERSIONED_STATE_ACCESS_IN_SLOT_HOOK_DISCRIMINANT = 232
-GAS_TESTER_DISCRIMINANT = 233
-INCORRECT_HOOKS_OVERRIDE_DISCRIMINANT = 234
-CORRECT_HOOKS_OVERRIDE_DISCRIMINANT = 235
-QUERY_MODULE_DISCRIMINANT = 236
-TEST_STRUCT_DISCRIMINANT = 237
-TEST_VISIBLE_HASH_MODULE_DISCRIMINANT = 238
-MODULE_2_DISCRIMINANT = 239
-MODULE_1_DISCRIMINANT = 240
-THIRD_TEST_STRUCT_DISCRIMINANT = 241
-TEST_HELPER_DISCRIMINANT = 242
-SECOND_TEST_STRUCT_DISCRIMINANT = 243
-FIRST_TEST_STRUCT_DISCRIMINANT = 244
-TEST_ACCESSORY_MODULE_DISCRIMINANT = 245
-MY_MODULE_DISCRIMINANT = 246
-TEST_MODULE_DISCRIMINANT = 247
-ROUTING_RECIPIENT_DISCRIMINANT = 248
-EXAMPLE_MODULE_DISCRIMINANT = 249
-SYNTHETIC_LOAD_DISCRIMINANT = 250
-TEST_RECIPIENT_DISCRIMINANT = 251
-ACCESS_PATTERN_DISCRIMINANT = 252
-HOOKS_COUNT_DISCRIMINANT = 253
-CACHE_AND_REVERT_TESTER_DISCRIMINANT = 254
-VALUE_SETTER_DISCRIMINANT = 255

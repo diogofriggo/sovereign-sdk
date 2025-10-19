@@ -382,10 +382,10 @@ impl EigenDaInclusionProof {
         )?;
 
         // Check if last ancestor is our actual parent
-        if let Some(ancestor) = last_ancestor
-            && !ancestor.is_parent(header)
-        {
-            return Err(IncorrectAncestry);
+        if let Some(ancestor) = last_ancestor {
+            if !ancestor.is_parent(header) {
+                return Err(IncorrectAncestry);
+            }
         }
 
         Ok(())
@@ -450,11 +450,11 @@ impl EigenDaInclusionProof {
     /// there is a single transaction with the valid certificate but invalid or
     /// missing data blob, the proof fails.
     #[instrument(skip_all, fields(block_height = header.height()))]
-    fn verify_certs_and_blobs(
-        &self,
-        header: &EthereumBlockHeader,
+    fn verify_certs_and_blobs<'a, 'b>(
+        &'a self,
+        header: &'b EthereumBlockHeader,
         cert_recency_window: u64,
-    ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>>
+    ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>> + use<'a, 'b>
     {
         // Returning of iterator might be a bit convoluted. But it's nice
         // because we can skip having to allocate a temporary vector for

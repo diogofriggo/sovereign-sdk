@@ -4,7 +4,7 @@ use crate::TokenHolder;
 use crate::{config_gas_token_id, get_token_id, Amount, Bank, Coins, TokenId};
 use axum::routing::get;
 use axum::Json;
-use derive_more::FromStr;
+use std::str::FromStr;
 use sov_modules_api::prelude::utoipa::openapi::OpenApi;
 use sov_modules_api::prelude::{axum, serde_yaml, UnwrapInfallible};
 use sov_modules_api::rest::utils::{errors, ApiResult, Path, Query};

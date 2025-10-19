@@ -16,8 +16,10 @@ use sov_sp1_adapter::guest::SP1Guest;
 use sov_sp1_adapter::SP1;
 use sov_state::ZkStorage;
 
-pub const ROLLUP_BATCH_NAMESPACE: Namespace = Namespace::const_v0(config_value!("BATCH_NAMESPACE"));
-pub const ROLLUP_PROOF_NAMESPACE: Namespace = Namespace::const_v0(config_value!("PROOF_NAMESPACE"));
+pub const CELESTIA_ROLLUP_BATCH_NAMESPACE: Namespace =
+    Namespace::const_v0(config_value!("CELESTIA_BATCH_NAMESPACE"));
+pub const CELESTIA_ROLLUP_PROOF_NAMESPACE: Namespace =
+    Namespace::const_v0(config_value!("CELESTIA_PROOF_NAMESPACE"));
 
 pub fn main() {
     let guest = SP1Guest::new();
@@ -28,8 +30,8 @@ pub fn main() {
     > = StfBlueprint::new();
 
     let rollup_params = sov_celestia_adapter::verifier::RollupParams {
-        rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-        rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
+        rollup_batch_namespace: CELESTIA_ROLLUP_BATCH_NAMESPACE,
+        rollup_proof_namespace: CELESTIA_ROLLUP_PROOF_NAMESPACE,
     };
 
     let stf_verifier =

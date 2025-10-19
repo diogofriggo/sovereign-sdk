@@ -30,7 +30,7 @@ use sov_state::DefaultStorageSpec;
 use sov_stf_runner::processes::{ParallelProverService, ProverService, RollupProverConfig};
 use sov_stf_runner::RollupConfig;
 
-use crate::{eth_dev_signer, ROLLUP_BATCH_NAMESPACE, ROLLUP_PROOF_NAMESPACE};
+use crate::{eth_dev_signer, CELESTIA_ROLLUP_BATCH_NAMESPACE, CELESTIA_ROLLUP_PROOF_NAMESPACE};
 
 /// Rollup with CelestiaDa
 #[derive(Default)]
@@ -122,8 +122,8 @@ impl FullNodeBlueprint<Native> for CelestiaNomtDemoRollup<Native> {
         CelestiaService::new(
             rollup_config.da.clone(),
             RollupParams {
-                rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-                rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
+                rollup_batch_namespace: CELESTIA_ROLLUP_BATCH_NAMESPACE,
+                rollup_proof_namespace: CELESTIA_ROLLUP_PROOF_NAMESPACE,
             },
         )
         .await
@@ -163,8 +163,8 @@ impl FullNodeBlueprint<Native> for CelestiaNomtDemoRollup<Native> {
         let outer_vm = MockZkvmHost::new_non_blocking();
 
         let rollup_params = RollupParams {
-            rollup_batch_namespace: ROLLUP_BATCH_NAMESPACE,
-            rollup_proof_namespace: ROLLUP_PROOF_NAMESPACE,
+            rollup_batch_namespace: CELESTIA_ROLLUP_BATCH_NAMESPACE,
+            rollup_proof_namespace: CELESTIA_ROLLUP_PROOF_NAMESPACE,
         };
 
         let da_verifier = CelestiaVerifier::new(rollup_params);
