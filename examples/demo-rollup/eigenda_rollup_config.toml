@@ -3,7 +3,7 @@
 # Private key of the sequencer. The account with corresponding private key is
 # used by the sequencer to persist the certificates to Ethereum. Expected
 # private key in the HEX format.
-signer = "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83"
+signer = "<REDACTED>" # required to run the demo rollup
 
 [da.proxy]
 # URL of the EigenDA proxy node.
@@ -24,7 +24,7 @@ state_cache_size = 4294967296 # 4GB. Default is 1GB.
 # any blocks before this height, and any blobs at this height will not be processed
 [runner]
 da_polling_interval_ms = 15000
-genesis_height = 9457843
+genesis_height = 9458463
 
 [runner.http_config]
 bind_host = "127.0.0.1"
