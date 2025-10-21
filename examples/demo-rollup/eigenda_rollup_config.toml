@@ -24,7 +24,7 @@ state_cache_size = 4294967296 # 4GB. Default is 1GB.
 # any blocks before this height, and any blobs at this height will not be processed
 [runner]
 da_polling_interval_ms = 15000
-genesis_height = 9447582
+genesis_height = 9457843
 
 [runner.http_config]
 bind_host = "127.0.0.1"
