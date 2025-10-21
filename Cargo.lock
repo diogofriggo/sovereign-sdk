@@ -2115,7 +2115,7 @@ dependencies = [
  "bitflags 2.9.4",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -2135,7 +2135,7 @@ dependencies = [
  "bitflags 2.9.4",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -4079,7 +4079,7 @@ dependencies = [
 [[package]]
 name = "eigenda-ethereum"
 version = "0.1.0"
-source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#3975c44316bca62bc7cdeb6d3285506ca850a70f"
+source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#933076aa4594d3376484cb0988d44ef6baf10a8c"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -4100,7 +4100,7 @@ dependencies = [
 [[package]]
 name = "eigenda-proxy"
 version = "0.1.0"
-source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#3975c44316bca62bc7cdeb6d3285506ca850a70f"
+source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#933076aa4594d3376484cb0988d44ef6baf10a8c"
 dependencies = [
  "backon",
  "bytes",
@@ -4118,7 +4118,7 @@ dependencies = [
 [[package]]
 name = "eigenda-srs-data"
 version = "0.1.0"
-source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#3975c44316bca62bc7cdeb6d3285506ca850a70f"
+source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#933076aa4594d3376484cb0988d44ef6baf10a8c"
 dependencies = [
  "ark-bn254",
  "rust-kzg-bn254-prover",
@@ -4127,7 +4127,7 @@ dependencies = [
 [[package]]
 name = "eigenda-verification"
 version = "0.1.0"
-source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#3975c44316bca62bc7cdeb6d3285506ca850a70f"
+source = "git+https://github.com/diogofriggo/eigenda.git?branch=master#933076aa4594d3376484cb0988d44ef6baf10a8c"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -5814,7 +5814,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration 0.6.1",
  "tokio",
  "tower-service",
@@ -6702,7 +6702,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
- "windows-targets 0.53.3",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -7613,7 +7613,7 @@ version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77e878c846a8abae00dd069496dbe8751b16ac1c3d6bd2a7283a938e8228f90d"
 dependencies = [
- "proc-macro-crate 3.3.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -8952,8 +8952,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -8973,7 +8973,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -9083,7 +9083,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls 0.23.31",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "thiserror 2.0.16",
  "tokio",
  "tracing",
@@ -9120,7 +9120,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -16224,7 +16224,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

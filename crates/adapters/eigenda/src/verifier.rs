@@ -6,7 +6,7 @@ use alloy_primitives::B256;
 use bytes::Bytes;
 use eigenda_verification::error::EigenDaVerificationError;
 use eigenda_verification::verification::blob::error::BlobVerificationError;
-use eigenda_verification::verification::{extract_certificate, verify_and_extract_blob};
+use eigenda_verification::verification::{extract_certificate, verify_and_extract_payload};
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -174,6 +174,10 @@ impl EigenDaCompletenessProof {
 /// Errors that may occur when verifying the [`EigenDaInclusionProof`].
 #[derive(Debug, Error)]
 pub enum InclusionProofError {
+    #[error("Error occurred while tried to recover a transaction sender")]
+    /// Error recovering transaction sender.
+    RecoverSenderError,
+
     #[error("Transaction ({0}) in proof wasn't part of the completeness proof")]
     /// Transaction in proof wasn't part of completeness proof.
     NotProvenTransaction(B256),
@@ -454,8 +458,8 @@ impl EigenDaInclusionProof {
         &'a self,
         header: &'b EthereumBlockHeader,
         cert_recency_window: u64,
-    ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>> + use<'a, 'b>
-    {
+    ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>>
+           + use<'a, 'b> {
         // Returning of iterator might be a bit convoluted. But it's nice
         // because we can skip having to allocate a temporary vector for
         // verified senders with blobs. The idea here is:
@@ -464,48 +468,59 @@ impl EigenDaInclusionProof {
         // - If both are valid, construct a validated blob with sender.
         self.transactions
             .iter()
-            .map(move |tx| self.process_transaction_with_blob(tx, header, cert_recency_window))
+            .flat_map(move |tx| self.process_transaction_with_blob(tx, header, cert_recency_window))
     }
 
+    // Whether an error is treated as an error or ignored is decided based on this: https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#derivation-process
     fn process_transaction_with_blob(
         &self,
         tx: &TransactionWithBlob,
         header: &EthereumBlockHeader,
         cert_recency_window: u64,
-    ) -> Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError> {
+    ) -> Option<Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>> {
+        use InclusionProofError::*;
+
         let TransactionWithBlob {
             tx,
             encoded_payload,
             cert_state,
         } = tx;
 
-        let cert = extract_certificate(tx)?;
+        // if either the `tx` is not an EIP1559 tx or certificate deserialization fails: ignore
+        let cert = extract_certificate(tx).ok()?;
         let referenced_height = cert.reference_block();
+
+        let height = header.height();
         #[cfg(feature = "use-rbn-state")]
-        let cert_state_header = {
-            let current_height = header.height();
-            self.get_ancestor(current_height, referenced_height)
-                .ok_or(InclusionProofError::IncorrectAncestry)?
+        let header = {
+            match self.get_ancestor(height, referenced_height) {
+                Some(header) => header,
+                None => return Some(Err(IncorrectAncestry)),
+            }
         };
-        #[cfg(not(feature = "use-rbn-state"))]
-        let cert_state_header = header;
 
         let tx_hash = *tx.hash();
-        let blob = verify_and_extract_blob(
+        let payload = match verify_and_extract_payload(
             tx_hash,
             &cert,
             cert_state,
-            cert_state_header.as_ref(),
-            header.height(),
+            header.as_ref(),
+            height,
             referenced_height,
             cert_recency_window,
             encoded_payload,
-        )?;
+        )? {
+            Ok(payload) => payload,
+            Err(err) => return Some(Err(EigenDaVerificationError(err))),
+        };
 
-        let sender = tx.recover_signer()?;
+        let Ok(sender) = tx.recover_signer() else {
+            return Some(Err(RecoverSenderError));
+        };
+
         let hash = EthereumHash::from(tx_hash);
         let sender = EthereumAddress::from(sender);
-        Ok((hash, sender, blob))
+        Some(Ok((hash, sender, payload)))
     }
 
     /// Get the [`EthereumBlockHeader`] for the specific referenced block. The
@@ -543,7 +558,7 @@ mod tests {
     use std::str::FromStr;
 
     use alloy_consensus::{EthereumTxEnvelope, Header, SignableTransaction, TxEip1559, TxEnvelope};
-    use alloy_primitives::{TxKind, address};
+    use alloy_primitives::{address, TxKind};
     use alloy_signer::Signature;
     use bytes::Bytes;
 
@@ -691,7 +706,7 @@ mod use_rbn_state_tests {
     use sov_rollup_interface::da::BlockHeaderTrait;
 
     use crate::spec::{BlobWithSender, NamespaceId};
-    use crate::verifier::{EigenDaInclusionProof, InclusionProofError, tests};
+    use crate::verifier::{tests, EigenDaInclusionProof, InclusionProofError};
 
     #[test]
     fn test_inclusion_proof_new() {
